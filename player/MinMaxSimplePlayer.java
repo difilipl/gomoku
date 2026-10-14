@@ -32,10 +32,11 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     }
 
     private boolean isSequenceStart(CellColor color, int x, int y,String direction){
-        switch direction1 {
-            case "SW":
-                break;
-        }
+///switch direction1 {
+       ///     case "SW":
+        ///        break;
+      ///  }
+        return true;
     }
 
 
