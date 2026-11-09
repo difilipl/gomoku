@@ -4,9 +4,8 @@ import fr.esisar.in450.gomoku.gamecore.AbstractPlayer;
 import fr.esisar.in450.gomoku.gamecore.enums.CellColor;
 import fr.esisar.in450.gomoku.gamecore.enums.Direction;
 import fr.esisar.in450.gomoku.gamecore.model.Coords;
+import fr.esisar.in450.gomoku.player.utils.Sequence;
 
-import java.awt.*;
-import java.util.ArrayList;
 
 public class MinMaxSimplePlayer extends AbstractPlayer {
     private int row;
@@ -23,21 +22,22 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         }
 
 
-        for (int i = 0; i < board.SIZE; i++){
-            row= i / board.SIZE;
+        for (int i = 0; i < board.SIZE * board.SIZE; i++){
+            row = i / board.SIZE;
             column = i % board.SIZE;
-            if( )
         }
     return new Coords();
 
     }
 
-    private player.Sequence lenthcut(int row, int column, Direction d, CellColor color){
+
+
+
+    private Sequence lenthcut(int row, int column, Direction d, CellColor color){
         int lenth = 0;
         int cut = 0;
         int r = row;
         int c = column;
-        ArrayList<Integer> res = new ArrayList<>();
         while(isColor(r, c,color)) {
             lenth++;
             r += d.getRow();
@@ -46,7 +46,7 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         }
         if(!(isColor(r,c,null))) cut += 1;
         if(!(isColor(row - d.getRow(), column - d.getColumn(), null))) cut += 1;
-        return new player.Sequence(lenth,cut);
+        return new Sequence(lenth,2-cut);
     }
 
 

@@ -1,4 +1,4 @@
-package player;
+package fr.esisar.in450.gomoku.player.utils;
 
 public class Sequence {
     private final int length;
