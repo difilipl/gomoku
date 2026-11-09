@@ -2,45 +2,69 @@ package fr.esisar.in450.gomoku.player;
 
 import fr.esisar.in450.gomoku.gamecore.AbstractPlayer;
 import fr.esisar.in450.gomoku.gamecore.enums.CellColor;
+import fr.esisar.in450.gomoku.gamecore.enums.Direction;
 import fr.esisar.in450.gomoku.gamecore.model.Coords;
 
+import java.awt.*;
+import java.util.ArrayList;
+
 public class MinMaxSimplePlayer extends AbstractPlayer {
-    private final int profondeur = 1; 
+    private int row;
+    private int column;
 
     @Override
     public Coords play()
     {
-        int x,y ;
+        if(board.isEmpty()){
 
-        ///la on est sur une complexité de 1 pour celui la, donc pas vraiment de fonction minmax, mais on va tout betement 
-        // calculer la valeur d'un board a chaque coup possible, 
+            row = (board.SIZE - 1) / 2;
+            column = (board.SIZE - 1) / 2;
+            return new Coords(row,column);
+        }
+
+
         for (int i = 0; i < board.SIZE; i++){
-            x = i / board.SIZE;
-            y = i % board.SIZE;
-             
-            if(isColor(CellColor.WHITE, x, y)){
-
-            }
+            row= i / board.SIZE;
+            column = i % board.SIZE;
+            if( )
         }
     return new Coords();
 
     }
 
-    private boolean isColor(CellColor color, int x, int y){
-        if(x >= board.SIZE || x < 0 || y >= board.SIZE || y < 0) return false;
-        return color == board.getCellColor(x,y);
+    private player.Sequence lenthcut(int row, int column, Direction d, CellColor color){
+        int lenth = 0;
+        int cut = 0;
+        int r = row;
+        int c = column;
+        ArrayList<Integer> res = new ArrayList<>();
+        while(isColor(r, c,color)) {
+            lenth++;
+            r += d.getRow();
+            c += d.getColumn();
+
+        }
+        if(!(isColor(r,c,null))) cut += 1;
+        if(!(isColor(row - d.getRow(), column - d.getColumn(), null))) cut += 1;
+        return new player.Sequence(lenth,cut);
     }
 
-    private boolean isSequenceStart(CellColor color, int x, int y,String direction){
-///switch direction1 {
-       ///     case "SW":
-        ///        break;
-      ///  }
-        return true;
+
+    private boolean isColor(int row, int column, CellColor color){
+        if(isValid(row) && isValid(column)) return color == board.getCellColor(row,column);
+        return false;
     }
 
 
+    private boolean isStarting(Coords pion, Direction d, CellColor color){
+        return !(isColor(pion.row - d.getRow(), pion.col - d.getColumn(), color));
+    }
 
+
+    private boolean isValid(int rowOrCol)
+    {
+        return rowOrCol>=0 && rowOrCol <board.SIZE;
+    }
 
 
 
