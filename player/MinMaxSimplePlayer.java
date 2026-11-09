@@ -6,6 +6,8 @@ import fr.esisar.in450.gomoku.gamecore.enums.Direction;
 import fr.esisar.in450.gomoku.gamecore.model.Coords;
 import fr.esisar.in450.gomoku.player.utils.Sequence;
 
+import java.awt.*;
+
 
 /**
  * IA Min-Max pour le Gomoku (plateau SIZE x SIZE, victoire à WIN_LENGTH pierres alignées).
@@ -26,9 +28,32 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     // Une suite avec un seul bout libre vaut dix fois moins qu'avec deux.
     private static final int HALF_OPEN_FACTOR = 10;
 
-    // Case en cours d'examen dans play().
-    private int row;
-    private int column;
+    // true : barème asymétrique (l'adversaire joue juste après mon coup).
+    // false : barème symétrique de la version de base. Permet de comparer les deux versions.
+    private static final boolean USE_ASYMMETRIC_SCALE = true;
+    // Barèmes asymétriques, indexés [longueur][extrémités libres] (longueur 0 à 4, bouts 0 à 2).
+    // Mes suites : mon 4 avec un seul bout libre sera simplement bouché par l'adversaire.
+    private static final int[][] MY_SCORES = {
+            {0, 0, 0},
+            {0, 0, 0},
+            {0, 1, 10},
+            {0, 100, 1_000},
+            {0, 1_000, 100_000}
+    };
+    // Suites adverses : il joue juste après, donc son 4 (même avec un seul bout libre)
+    // est une victoire assurée, et son 3 ouvert devient un 4 ouvert.
+    private static final int[][] ENEMY_SCORES = {
+            {0, 0, 0},
+            {0, 0, 0},
+            {0, 1, 10},
+            {0, 100, 50_000},
+            {0, 500_000, 500_000}
+    };
+
+    // Nombre d'appels à evaluate() pendant le coup en cours (remis à zéro dans play()).
+    private int moveEvaluations = 0;
+    // Nombre d'appels à evaluate() depuis le début de la partie.
+    private int totalEvaluations = 0;
 
     /**
      * Choisit le coup à jouer.
@@ -40,35 +65,78 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     @Override
     public Coords play()
     {
+        int bestScore = Integer.MIN_VALUE;
+        Coords bestMove = null;
+        moveEvaluations = 0;
+
         if(board.isEmpty()){
-
-            row = (board.SIZE - 1) / 2;
-            column = (board.SIZE - 1) / 2;
-            return new Coords(row,column);
+            int center = (board.SIZE - 1) / 2;
+            return new Coords(center, center);
         }
-
 
         for (int i = 0; i < board.SIZE * board.SIZE; i++){
-            row = i / board.SIZE;
-            column = i % board.SIZE;
+            int row = i / board.SIZE;
+            int column = i % board.SIZE;
+            if(board.getCellColor(row, column) == null ){
+                board.setCellColor(row, column, playerColor);
+                int score = evaluate();
+                board.setCellColor(row, column, null);
+                if(score > bestScore){
+                    bestScore = score;
+                    bestMove = new Coords(row, column);
+                }
+            }
         }
-    return new Coords();
-
+        return bestMove;
     }
 
+    /**
+     * Évalue le plateau du point de vue de l'IA : mes points - points adverses.
+     * Version naïve (référence) : on parcourt toutes les cases et, pour chaque pierre,
+     * les 4 directions. Une suite n'est mesurée qu'à partir de sa première pierre
+     * (isStarting), pour ne pas la compter plusieurs fois.
+     */
+    private int evaluate(){
+        moveEvaluations++;
+        totalEvaluations++;
 
+        int myPoints = 0;
+        int enemyPoints = 0;
+
+        for (int i = 0; i < board.SIZE * board.SIZE; i++){
+            int row = i / board.SIZE;
+            int column = i % board.SIZE;
+            CellColor color = board.getCellColor(row, column);
+            if(color == null) continue;
+
+            for(Direction d : Direction.values()){
+                if(isStarting(new Coords(row, column), d, color)){
+                    boolean isMine = color == playerColor;
+                    int score = scoreSequence(lenthcut(row, column, d, color), isMine);
+                    if(isMine) myPoints += score;
+                    else enemyPoints += score;
+                }
+            }
+        }
+        return myPoints - enemyPoints;
+    }
 
     /**
      * Score d'une suite selon sa longueur et ses extrémités libres.
      * 5 pierres ou plus : victoire, quels que soient les bouts.
      * Bloquée des deux côtés : ne pourra jamais faire 5, vaut 0.
      * Un seul bout libre : le score d'une suite ouverte divisé par HALF_OPEN_FACTOR.
+     * Avec USE_ASYMMETRIC_SCALE, on lit MY_SCORES ou ENEMY_SCORES selon isMine.
+     * @param isMine vrai si la suite est de la couleur de l'IA
      */
-    private int scoreSequence(Sequence sequence) {
+    private int scoreSequence(Sequence sequence, boolean isMine) {
         int length = sequence.getLength();
         int openEnds = sequence.getOpenEnds();
 
         if (length >= WIN_LENGTH) return WIN_SCORE;
+        if (USE_ASYMMETRIC_SCALE) {
+            return isMine ? MY_SCORES[length][openEnds] : ENEMY_SCORES[length][openEnds];
+        }
         if (openEnds == 0) return NO_SCORE;
 
         int openScore = OPEN_SCORE_BY_LENGTH[length];

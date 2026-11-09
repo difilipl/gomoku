@@ -37,10 +37,54 @@ Justifications :
 - **Un bout libre = score ouvert / 10** (`HALF_OPEN_FACTOR`). Ça évite de dupliquer le barème.
 - Toutes les valeurs sont des constantes nommées (`WIN_SCORE`, `OPEN_SCORE_BY_LENGTH`, ...).
 
+### Évaluation (`evaluate`), version naïve
+- Version volontairement simple : elle sert de **référence** pour mesurer chaque optimisation.
+- On parcourt toutes les cases. Les cases vides sont sautées.
+- Pour chaque pierre, on regarde 4 directions et on ne mesure la suite que si la pierre en est le début (`isStarting`). Sinon, la même suite serait comptée plusieurs fois.
+- Le score de la suite va dans *mes points* si la couleur est `playerColor`, sinon dans *points adverses*. On renvoie mes points − points adverses, toujours du point de vue de l'IA.
+- Compteurs : deux attributs de la classe. L'un est remis à zéro au début de `play` (appels **par coup**), l'autre n'est jamais remis à zéro (total de la partie).
+  - Par coup est la mesure à comparer : le total dépend de la longueur de la partie.
+  - Attributs et pas paramètre : en Java, un `int` est passé par valeur, et avec la récursion `evaluate` sera appelée loin de `play`.
+
+### Pièges rencontrés
+- `row` / `column` en attributs : `evaluate` les modifie pendant que `play` s'en sert dans sa propre boucle, donc `play` perd la case qu'il examinait. Ces variables doivent être **locales** à chaque méthode.
+- Compteurs : attributs d'instance et non `static`, sinon deux IA qui jouent l'une contre l'autre partagent le même compteur.
+
+### Choix du coup (`play`), profondeur 1
+- Pour chaque case vide : on pose ma pierre, on appelle `evaluate`, on retire la pierre, et on garde le coup au meilleur score.
+- Meilleur score de départ : `Integer.MIN_VALUE` et pas 0. Si l'adversaire menace, tous les scores sont négatifs, et avec 0 aucun coup ne serait retenu.
+- La pierre est retirée juste après l'évaluation, pour que le plateau soit intact pour la case suivante.
+- Nombre d'appels attendu en profondeur 1 : un par case vide, soit au plus 225 − nombre de pierres posées.
+
+### Test de la profondeur 1 (partie contre un humain, 2026-11-09)
+- L'IA (blanc) a perdu en 6 coups. L'humain a fait une diagonale de (3,3) à (6,6), bloquée d'un côté par une pierre blanche, avec (2,2) libre.
+- Au tour 11, bloquer en (2,2) rapportait environ +10 000, alors que se faire un 4 ouvert en colonne 8 rapportait environ +90 000 (100 000 − 10 000). L'IA a attaqué.
+- Elle ne voit pas que l'adversaire joue juste après et gagne avant elle. Ce n'est pas un bug, c'est la **limite de la profondeur 1**, et ça justifie le passage au Min-Max en profondeur 2.
+- Temps par coup : 0 à 4 ms.
+
+### Piste : barème asymétrique (version à comparer)
+`evaluate` est toujours appelée juste après mon coup, donc c'est toujours à l'adversaire de jouer. Une même menace ne vaut pas la même chose selon sa couleur.
+
+| Motif | Mes suites | Suites adverses (soustraites) |
+|---|---|---|
+| 5 ou plus | 1 000 000 | 1 000 000 |
+| 4, 2 bouts libres | 100 000 | 500 000 |
+| 4, 1 bout libre | 1 000 | 500 000 |
+| 3, 2 bouts libres | 1 000 | 50 000 |
+| 3, 1 bout libre | 100 | 100 |
+| 2, 2 bouts libres | 10 | 10 |
+| 2, 1 bout libre | 1 | 1 |
+
+- Un 4 adverse avec au moins un bout libre est complété au coup suivant : presque une défaite.
+- Un 3 ouvert adverse devient un 4 ouvert : très dangereux, mais moins que mon 4 ouvert, avec lequel je gagne avant lui.
+- Mon 4 avec un seul bout libre sera simplement bouché.
+- Vérification sur le tour 11 de la partie test : bloquer en (2,2) vaut environ +1 000, jouer (9,8) vaut 100 000 − 500 000 = −400 000. L'IA bloque.
+- Implémenté : tableaux `MY_SCORES` / `ENEMY_SCORES` et paramètre `isMine` dans `scoreSequence`. La constante `USE_ASYMMETRIC_SCALE` permet de revenir au barème symétrique pour comparer.
+- Vérifié sur la position du tour 11 : barème symétrique → (9, 8), partie perdue ; barème asymétrique → (2, 2), menace bloquée.
+- Limite : c'est un pansement. Il ne voit pas les pièges à deux coups, seul le Min-Max le fait.
+
 ### À venir
-- `evaluate` : somme des scores de mes suites − somme des scores des suites adverses, toujours du point de vue de l'IA.
-- `play` profondeur 1 : garder le coup qui maximise `evaluate`.
-- Compteurs d'appels (`evaluate` et `minmax`).
+- Récursion `minmax` (profondeur 2 puis 3), compteur de nœuds.
 
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
