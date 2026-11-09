@@ -87,6 +87,7 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
                 }
             }
         }
+        System.out.println("Appels à evaluate : " + moveEvaluations + " ce coup, " + totalEvaluations + " depuis le début");
         return bestMove;
     }
 
