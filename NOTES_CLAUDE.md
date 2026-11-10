@@ -103,7 +103,10 @@ Justifications :
 - Conclusion : sans optimisation, la profondeur 3 est déjà à la limite. Il faut réduire b (coups candidats) et couper des branches (alpha-bêta).
 
 ### À vérifier
-- Le barème asymétrique suppose que l'adversaire joue juste après la position évaluée. En profondeur 2, c'est l'IA qui rejoue après la feuille : l'hypothèse s'inverse. À revoir.
+- Le barème asymétrique suppose que l'adversaire joue juste après la position évaluée. En profondeur 2 (et toute profondeur paire), c'est l'IA qui rejoue après la feuille : l'hypothèse s'inverse (mon 4 à un bout libre devient une victoire, le 4 adverse à un bout libre se bouche).
+  - `depth` ne peut pas servir à le savoir (il vaut toujours 0 à la feuille). C'est `isMyTurn` qui dit qui joue dans la position évaluée : on le passe à `evaluate`.
+  - Les deux tableaux sont en fait « barème du joueur qui va jouer » (`ENEMY_SCORES` actuel) et « barème du joueur qui attend » (`MY_SCORES` actuel). Règle : si c'est à moi de jouer à la feuille, on inverse (mes suites → barème « qui va jouer », suites adverses → barème « qui attend »).
+  - À coder plus tard, en renommant les tableaux (`TO_MOVE_SCORES` / `WAITING_SCORES`).
 - Ajouter un compteur de nœuds `minMax` (en plus des appels à `evaluate`).
 
 ### Préparé pour la coupure sur victoire (version suivante)

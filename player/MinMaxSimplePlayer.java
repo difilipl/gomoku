@@ -32,17 +32,18 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     // false : barème symétrique de la version de base. Permet de comparer les deux versions.
     private static final boolean USE_ASYMMETRIC_SCALE = true;
     // Barèmes asymétriques, indexés [longueur][extrémités libres] (longueur 0 à 4, bouts 0 à 2).
-    // Mes suites : mon 4 avec un seul bout libre sera simplement bouché par l'adversaire.
-    private static final int[][] MY_SCORES = {
+    // Ils dépendent de qui joue juste après la position évaluée (à la feuille).
+    // Joueur qui attend : son 4 avec un seul bout libre sera simplement bouché.
+    private static final int[][] WAITING_SCORES = {
             {0, 0, 0},
             {0, 0, 0},
             {0, 1, 10},
             {0, 100, 1_000},
             {0, 1_000, 100_000}
     };
-    // Suites adverses : il joue juste après, donc son 4 (même avec un seul bout libre)
-    // est une victoire assurée, et son 3 ouvert devient un 4 ouvert.
-    private static final int[][] ENEMY_SCORES = {
+    // Joueur qui va jouer : son 4 (même avec un seul bout libre) est une victoire assurée,
+    // et son 3 ouvert devient un 4 ouvert.
+    private static final int[][] TO_MOVE_SCORES = {
             {0, 0, 0},
             {0, 0, 0},
             {0, 1, 10},
@@ -106,7 +107,7 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     private int minMax(int depth, boolean isMyTurn){
         int bestScore;
         CellColor color;
-        if(depth == 0) return evaluate();
+        if(depth == 0) return evaluate(isMyTurn);
 
         if(isMyTurn){
             bestScore = Integer.MIN_VALUE;
@@ -138,8 +139,10 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
      * Version naïve (référence) : on parcourt toutes les cases et, pour chaque pierre,
      * les 4 directions. Une suite n'est mesurée qu'à partir de sa première pierre
      * (isStarting), pour ne pas la compter plusieurs fois.
+     * @param isMyTurn vrai si c'est à l'IA de jouer dans la position évaluée
+     *                 (choisit le barème de chaque suite)
      */
-    private int evaluate(){
+    private int evaluate(boolean isMyTurn){
         moveEvaluations++;
         totalEvaluations++;
 
@@ -155,7 +158,8 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
             for(Direction d : Direction.values()){
                 if(isStarting(new Coords(row, column), d, color)){
                     boolean isMine = color == playerColor;
-                    int score = scoreSequence(lenthcut(row, column, d, color), isMine);
+                    boolean ownerMovesNext = isMine == isMyTurn;
+                    int score = scoreSequence(lenthcut(row, column, d, color), ownerMovesNext);
                     if(isMine) myPoints += score;
                     else enemyPoints += score;
                 }
@@ -169,16 +173,17 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
      * 5 pierres ou plus : victoire, quels que soient les bouts.
      * Bloquée des deux côtés : ne pourra jamais faire 5, vaut 0.
      * Un seul bout libre : le score d'une suite ouverte divisé par HALF_OPEN_FACTOR.
-     * Avec USE_ASYMMETRIC_SCALE, on lit MY_SCORES ou ENEMY_SCORES selon isMine.
-     * @param isMine vrai si la suite est de la couleur de l'IA
+     * Avec USE_ASYMMETRIC_SCALE, on lit TO_MOVE_SCORES si le propriétaire de la suite
+     * joue juste après, WAITING_SCORES sinon.
+     * @param ownerMovesNext vrai si le propriétaire de la suite est le prochain à jouer
      */
-    private int scoreSequence(Sequence sequence, boolean isMine) {
+    private int scoreSequence(Sequence sequence, boolean ownerMovesNext) {
         int length = sequence.getLength();
         int openEnds = sequence.getOpenEnds();
 
         if (length >= WIN_LENGTH) return WIN_SCORE;
         if (USE_ASYMMETRIC_SCALE) {
-            return isMine ? MY_SCORES[length][openEnds] : ENEMY_SCORES[length][openEnds];
+            return ownerMovesNext ? TO_MOVE_SCORES[length][openEnds] : WAITING_SCORES[length][openEnds];
         }
         if (openEnds == 0) return NO_SCORE;
 
