@@ -83,8 +83,34 @@ Justifications :
 - Vérifié sur la position du tour 11 : barème symétrique → (9, 8), partie perdue ; barème asymétrique → (2, 2), menace bloquée.
 - Limite : c'est un pansement. Il ne voit pas les pièges à deux coups, seul le Min-Max le fait.
 
-### À venir
-- Récursion `minmax` (profondeur 2 puis 3), compteur de nœuds.
+## 1 bis. Min-Max récursif sans optimisation (branche `minmax-depth2`, 2026-11-10)
+
+### Principe
+- `minMax(depth, isMyTurn)` renvoie un **score** (pas un coup) : c'est `play` qui garde le meilleur coup.
+- `depth` = nombre de demi-coups qui restent à explorer. Cas de base : `depth == 0` → on renvoie `evaluate()`. Les évaluations ne se font qu'aux feuilles.
+- `isMyTurn` (booléen) : à mon tour je pose `playerColor` et je garde le **plus grand** score ; au tour adverse je pose `getEnemyColor()` et je garde le **plus petit** (l'adversaire choisit le coup le pire pour moi, car `evaluate` est toujours de mon point de vue).
+- Valeurs de départ : `Integer.MIN_VALUE` pour un max, `Integer.MAX_VALUE` pour un min.
+- Appel récursif : profondeur − 1 et `!isMyTurn` (les tours alternent).
+- `play` est le premier niveau : elle pose déjà ma pierre, puis appelle `minMax(DEPTH - 1, false)`. Avec `DEPTH = 1`, on retrouve exactement la version précédente (mêmes coups, mêmes appels).
+- `DEPTH` est une constante (`private static final`), réglable.
+- Couleur adverse : `CellColor` n'a que deux valeurs, et `playerColor` n'est connu qu'après `setColor` (méthode `final` de `AbstractPlayer`), d'où une méthode `getEnemyColor()` plutôt qu'un attribut fixé au constructeur.
+
+### Mesures (même ouverture : IA au centre, puis Noir en 8 9)
+- Profondeur 1 : 223 appels pour le premier coup calculé (223 cases vides).
+- Profondeur 2 : 49 506 appels = 223 × 222, environ 70 ms.
+- Profondeur 3 : 10 940 826 appels = 223 × 222 × 221, environ 8 s (mesuré par Claude, sur une autre machine).
+- Chaque niveau multiplie le travail par le nombre de cases vides : complexité **O(b^d)**, avec b ≈ 220 coups possibles et d la profondeur. Une profondeur 4 prendrait de l'ordre d'une demi-heure par coup.
+- Conclusion : sans optimisation, la profondeur 3 est déjà à la limite. Il faut réduire b (coups candidats) et couper des branches (alpha-bêta).
+
+### À vérifier
+- Le barème asymétrique suppose que l'adversaire joue juste après la position évaluée. En profondeur 2, c'est l'IA qui rejoue après la feuille : l'hypothèse s'inverse. À revoir.
+- Ajouter un compteur de nœuds `minMax` (en plus des appels à `evaluate`).
+
+### Préparé pour la coupure sur victoire (version suivante)
+- On n'évalue que la position finale de chaque suite de coups : elle contient toutes les pierres posées en route. Défaut : une victoire au milieu du chemin n'arrête pas la recherche, et une victoire immédiate vaut autant qu'une victoire lointaine.
+- Correction : juste après avoir posé une pierre, vérifier si elle fait 5. Seule cette pierre peut créer un nouveau 5, donc on regarde seulement autour d'elle (4 directions, dans les deux sens), pas tout le plateau.
+- Si oui, on arrête de descendre : victoire → `WIN_SCORE + depth` ; défaite → `-(WIN_SCORE + depth)`. `depth` est la profondeur restante : plus elle est grande, plus la fin est proche. L'IA préfère donc gagner vite et retarder une défaite.
+- On ne coupe que sur un 5 (certain), pas sur un 4 ouvert (estimation) : la coupure ne doit pas changer le résultat.
 
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
@@ -97,4 +123,6 @@ Pour chaque version, noter le nombre d'appels avant et après.
 
 | Version | Profondeur | Appels à evaluate | Nœuds minmax | Remarque |
 |---|---|---|---|---|
-| | | | | |
+| Min-Max simple | 1 | 223 (1er coup) | non compté | toutes les cases vides |
+| Min-Max simple | 2 | 49 506 (1er coup) | non compté | 223 × 222, ~70 ms |
+| Min-Max simple | 3 | 10 940 826 (1er coup) | non compté | 223 × 222 × 221, ~8 s |

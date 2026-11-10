@@ -55,6 +55,9 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     // Nombre d'appels à evaluate() depuis le début de la partie.
     private int totalEvaluations = 0;
 
+    // Profondeur du Min-Max : nombre de demi-coups explorés (mon coup compte pour 1).
+    private static final int DEPTH = 2;
+
     /**
      * Choisit le coup à jouer.
      * Plateau vide : on joue au centre, la case qui offre le plus d'alignements.
@@ -79,7 +82,8 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
             int column = i % board.SIZE;
             if(board.getCellColor(row, column) == null ){
                 board.setCellColor(row, column, playerColor);
-                int score = evaluate();
+                // Mon coup est posé : c'est à l'adversaire, il reste DEPTH - 1 niveaux.
+                int score = minMax(DEPTH - 1, false);
                 board.setCellColor(row, column, null);
                 if(score > bestScore){
                     bestScore = score;
@@ -90,6 +94,44 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         System.out.println("Appels à evaluate : " + moveEvaluations + " ce coup, " + totalEvaluations + " depuis le début");
         return bestMove;
     }
+
+    /**
+     * Score du plateau, du point de vue de l'IA, en explorant encore depth demi-coups.
+     * Profondeur 0 : on évalue le plateau. Sinon, on essaie chaque case vide :
+     * à mon tour je garde le plus grand score, au tour adverse le plus petit
+     * (l'adversaire choisit le coup le pire pour moi).
+     * @param depth nombre de demi-coups restant à explorer
+     * @param isMyTurn vrai si c'est à l'IA de poser une pierre à ce niveau
+     */
+    private int minMax(int depth, boolean isMyTurn){
+        int bestScore;
+        CellColor color;
+        if(depth == 0) return evaluate();
+
+        if(isMyTurn){
+            bestScore = Integer.MIN_VALUE;
+            color = playerColor;
+        }
+        else{
+            bestScore = Integer.MAX_VALUE;
+            color = getEnemyColor();
+        }
+
+        for (int i = 0; i < board.SIZE * board.SIZE; i++){
+            int row = i / board.SIZE;
+            int column = i % board.SIZE;
+            if(board.getCellColor(row, column) == null ){
+                board.setCellColor(row, column, color);
+                int score = minMax(depth - 1, !(isMyTurn));
+                board.setCellColor(row, column, null);
+                if(isMyTurn ? bestScore < score : bestScore > score){
+                    bestScore = score;
+                }
+            }
+        }
+        return bestScore;
+    }
+
 
     /**
      * Évalue le plateau du point de vue de l'IA : mes points - points adverses.
@@ -175,6 +217,14 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     private boolean isColor(int row, int column, CellColor color){
         if(isValid(row) && isValid(column)) return color == board.getCellColor(row,column);
         return false;
+    }
+
+    /**
+     * Couleur de l'adversaire. CellColor n'a que deux valeurs, et playerColor n'est
+     * connu qu'après setColor, d'où une méthode plutôt qu'un attribut fixé au constructeur.
+     */
+    private CellColor getEnemyColor(){
+        return playerColor == CellColor.BLACK ? CellColor.WHITE : CellColor.BLACK;
     }
 
 
