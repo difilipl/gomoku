@@ -115,6 +115,26 @@ Justifications :
 - Si oui, on arrête de descendre : victoire → `WIN_SCORE + depth` ; défaite → `-(WIN_SCORE + depth)`. `depth` est la profondeur restante : plus elle est grande, plus la fin est proche. L'IA préfère donc gagner vite et retarder une défaite.
 - On ne coupe que sur un 5 (certain), pas sur un 4 ouvert (estimation) : la coupure ne doit pas changer le résultat.
 
+## 1 ter. Coups candidats (branche `candidate-moves`, 2026-11-11)
+
+### Principe
+- On n'essaie plus toutes les cases vides, seulement celles qui ont une pierre (de n'importe quelle couleur) à au plus 2 cases en ligne et en colonne (carré 5 × 5 autour de la case).
+- Distance 2 plutôt que 1 : à distance 1, on raterait des coups qui préparent un motif à trou comme `X _ X`.
+- Méthode `isNeighbour(row, column)` : deux boucles sur l'écart de ligne et de colonne, de -2 à +2 ; `continue` si la case sort du plateau ; `return true` dès qu'une pierre est trouvée ; `false` sinon.
+- Coût : au plus 24 cases lues, bien moins qu'un `evaluate` (tout le plateau × 4 directions). Et chaque case éliminée évite tout un sous-arbre.
+- Condition dans `play` et `minMax` : `case vide && isNeighbour` (le test le moins cher d'abord, `&&` s'arrête au premier faux).
+- Piège évité : `!isColor(r, c, null)` vaut `true` hors plateau, d'où le test `isValid` d'abord.
+
+### Mesures (même ouverture : IA en (7, 7), Noir tape « 8 9 » = case (7, 8), car `HumanPlayer` retire 1)
+- Profondeur 1 : 28 appels (avant 223). Calcul : 25 + 25 − 20 (recouvrement 5 × 4) − 2 cases occupées.
+- Profondeur 2 : 1 050 mesurés (avant 49 506).
+- Profondeur 3 : 48 380 mesurés (avant 10 940 826).
+- Le gain est d'environ (223 / 28)^d : il grandit avec la profondeur, car on réduit b dans O(b^d).
+
+### Limites
+- Mesuré en début de partie : en milieu de partie, il y a plus de candidats (souvent 60 à 100), le gain baisse mais reste grand.
+- Ce n'est pas exact (contrairement à l'alpha-bêta) : on suppose qu'un coup loin de toute pierre n'est jamais le meilleur, ce qui est presque toujours vrai au Gomoku.
+
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
 - Coups candidats : uniquement les cases proches des pierres déjà posées.
@@ -129,3 +149,6 @@ Pour chaque version, noter le nombre d'appels avant et après.
 | Min-Max simple | 1 | 223 (1er coup) | non compté | toutes les cases vides |
 | Min-Max simple | 2 | 49 506 (1er coup) | non compté | 223 × 222, ~70 ms |
 | Min-Max simple | 3 | 10 940 826 (1er coup) | non compté | 223 × 222 × 221, ~8 s |
+| + coups candidats (distance 2) | 1 | 28 (1er coup) | non compté | mesuré |
+| + coups candidats (distance 2) | 2 | 1 050 (1er coup) | non compté | mesuré |
+| + coups candidats (distance 2) | 3 | 48 380 (1er coup) | non compté | mesuré |

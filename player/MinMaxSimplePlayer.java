@@ -57,8 +57,9 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     private int totalEvaluations = 0;
 
     // Profondeur du Min-Max : nombre de demi-coups explorés (mon coup compte pour 1).
-    private static final int DEPTH = 2;
+    private static final int DEPTH = 3;
 
+    private static final int DIST = 2;
     /**
      * Choisit le coup à jouer.
      * Plateau vide : on joue au centre, la case qui offre le plus d'alignements.
@@ -81,7 +82,7 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         for (int i = 0; i < board.SIZE * board.SIZE; i++){
             int row = i / board.SIZE;
             int column = i % board.SIZE;
-            if(board.getCellColor(row, column) == null ){
+            if(board.getCellColor(row, column) == null && isNeighbour(row,column) ){
                 board.setCellColor(row, column, playerColor);
                 // Mon coup est posé : c'est à l'adversaire, il reste DEPTH - 1 niveaux.
                 int score = minMax(DEPTH - 1, false);
@@ -121,7 +122,7 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         for (int i = 0; i < board.SIZE * board.SIZE; i++){
             int row = i / board.SIZE;
             int column = i % board.SIZE;
-            if(board.getCellColor(row, column) == null ){
+            if(board.getCellColor(row, column) == null && isNeighbour(row,column)){
                 board.setCellColor(row, column, color);
                 int score = minMax(depth - 1, !(isMyTurn));
                 board.setCellColor(row, column, null);
@@ -166,6 +167,16 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
             }
         }
         return myPoints - enemyPoints;
+    }
+
+    private boolean isNeighbour(int row,int column){
+        for (int i = row - DIST; i <= row + DIST ; i++) {
+            for (int j = column - DIST; j <= column + DIST ; j++) {
+                if(!isValid(i) || !isValid(j)) continue;
+                if(!isColor(i,j,null)) return true;
+            }
+        }
+        return false;
     }
 
     /**
