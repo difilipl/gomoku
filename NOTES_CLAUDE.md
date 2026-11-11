@@ -135,6 +135,26 @@ Justifications :
 - Mesuré en début de partie : en milieu de partie, il y a plus de candidats (souvent 60 à 100), le gain baisse mais reste grand.
 - Ce n'est pas exact (contrairement à l'alpha-bêta) : on suppose qu'un coup loin de toute pierre n'est jamais le meilleur, ce qui est presque toujours vrai au Gomoku.
 
+## 1 quater. Coupure sur victoire (branche `win-cutoff`, 2026-11-11)
+
+### Principe
+- Juste après avoir posé une pierre (dans `play` et dans `minMax`), `isWinningMove(row, column, color)` regarde si **cette** pierre fait un 5. Seule elle peut créer un nouveau 5, donc on ne regarde qu'autour d'elle.
+- `isWinningMove` : pour chacune des 4 directions, une seule boucle de `i = -(WIN_LENGTH - 1)` à `+(WIN_LENGTH - 1)` couvre les deux sens. Compteur +1 si la case est de ma couleur, remis à 0 sinon (une suite doit être continue : `X X _ X X X` n'est pas un 5). Test `>= WIN_LENGTH` à chaque case, pour ne pas rater un 5 suivi d'une case vide. `isColor` gère les bords.
+- Coût : au plus 4 × 9 cases lues, contre tout le plateau pour `evaluate`.
+- Dans `minMax`, le test est fait **avant** l'appel récursif (sinon on ne coupe rien). Si le coup gagne : on retire la pierre, puis `return WIN_SCORE + depth` si c'est moi, `return -(WIN_SCORE + depth)` si c'est l'adversaire.
+- `depth` (profondeur restante) et pas `DEPTH` (constante) : plus il reste de profondeur, plus la fin est proche. L'IA préfère gagner vite et perdre le plus tard possible.
+- Dans `play`, un coup gagnant est joué tout de suite (rien ne peut faire mieux qu'un 5). La pierre est retirée avant de renvoyer le coup.
+- On ne coupe que sur un 5 (certain), jamais sur une estimation : la coupure ne change pas le coup choisi, elle évite seulement du travail inutile.
+
+### Mesures
+Test 1 (tu joues 8 9, 8 10, 8 11, 8 12) : identique à la version précédente, car aucun 5 n'est possible avant la fin. L'IA gagne en 4 coups (et préfère finir son 4 plutôt que bloquer le tien).
+- Profondeur 1 : 28, 40, 52 appels. Profondeur 2 : 1 050, 1 598, 2 364. Profondeur 3 : 48 380, 83 531, 131 851.
+
+Test 2, profondeur 2 (tu joues 6 6, 6 8, 5 6, 4 6, 3 6, 7 5, 5 7, 1 4) : l'IA bloque ton 4 en 2 6, puis gagne en 4 9.
+- Appels : 1 830, 2 006, 2 276, 2 741, **431**, 3 357, 3 587.
+- Sans la coupure : mêmes coups, mais **3 021** appels pour le coup du blocage. Tout coup qui ne bloque pas est éliminé dès qu'une réponse adverse fait 5, sans évaluer le reste de son sous-arbre.
+- Conclusion : la coupure change peu en début de partie, mais beaucoup dès qu'il y a des menaces (ici 7 fois moins d'appels).
+
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
 - Coups candidats : uniquement les cases proches des pierres déjà posées.
@@ -152,3 +172,5 @@ Pour chaque version, noter le nombre d'appels avant et après.
 | + coups candidats (distance 2) | 1 | 28 (1er coup) | non compté | mesuré |
 | + coups candidats (distance 2) | 2 | 1 050 (1er coup) | non compté | mesuré |
 | + coups candidats (distance 2) | 3 | 48 380 (1er coup) | non compté | mesuré |
+| + coupure sur victoire | 1 / 2 / 3 | 28 / 1 050 / 48 380 (1er coup) | non compté | identique en début de partie |
+| + coupure sur victoire | 2 | 431 (coup du blocage, test 2) | non compté | 3 021 sans la coupure |

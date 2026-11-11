@@ -59,13 +59,18 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     // Profondeur du Min-Max : nombre de demi-coups explorés (mon coup compte pour 1).
     private static final int DEPTH = 3;
 
-    private static final int DIST = 2;
+    // Coups candidats : une case vide n'est essayée que si une pierre se trouve
+    // à au plus NEIGHBOUR_DISTANCE cases d'elle, en ligne et en colonne.
+    private static final int NEIGHBOUR_DISTANCE = 2;
+
     /**
      * Choisit le coup à jouer.
      * Plateau vide : on joue au centre, la case qui offre le plus d'alignements.
      * Sinon : on parcourt les SIZE * SIZE cases avec un seul indice i
-     * (ligne = i / SIZE, colonne = i % SIZE). À compléter : poser la pierre,
-     * évaluer le plateau, retirer la pierre, garder le meilleur coup.
+     * (ligne = i / SIZE, colonne = i % SIZE) et on n'essaie que les coups candidats
+     * (case vide proche d'une pierre). Un coup qui fait 5 est joué tout de suite.
+     * Pour les autres : poser la pierre, lancer minMax, retirer la pierre,
+     * garder le meilleur coup.
      */
     @Override
     public Coords play()
@@ -82,8 +87,14 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         for (int i = 0; i < board.SIZE * board.SIZE; i++){
             int row = i / board.SIZE;
             int column = i % board.SIZE;
-            if(board.getCellColor(row, column) == null && isNeighbour(row,column) ){
+            // Case vide testée d'abord : c'est le test le moins cher.
+            if(board.getCellColor(row, column) == null && isNeighbour(row, column)){
                 board.setCellColor(row, column, playerColor);
+                // Coup gagnant : rien ne peut faire mieux, on le joue sans chercher plus loin.
+                if(isWinningMove(row, column, playerColor)){
+                    board.setCellColor(row, column, null);
+                    return new Coords(row, column);
+                }
                 // Mon coup est posé : c'est à l'adversaire, il reste DEPTH - 1 niveaux.
                 int score = minMax(DEPTH - 1, false);
                 board.setCellColor(row, column, null);
@@ -99,9 +110,12 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
 
     /**
      * Score du plateau, du point de vue de l'IA, en explorant encore depth demi-coups.
-     * Profondeur 0 : on évalue le plateau. Sinon, on essaie chaque case vide :
+     * Profondeur 0 : on évalue le plateau. Sinon, on essaie chaque coup candidat :
      * à mon tour je garde le plus grand score, au tour adverse le plus petit
      * (l'adversaire choisit le coup le pire pour moi).
+     * Si un coup fait 5, la partie est finie : on ne descend pas plus bas et on renvoie
+     * WIN_SCORE + depth (victoire) ou -(WIN_SCORE + depth) (défaite). Plus depth est grand,
+     * plus la fin est proche : l'IA préfère gagner vite et perdre le plus tard possible.
      * @param depth nombre de demi-coups restant à explorer
      * @param isMyTurn vrai si c'est à l'IA de poser une pierre à ce niveau
      */
@@ -122,8 +136,14 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         for (int i = 0; i < board.SIZE * board.SIZE; i++){
             int row = i / board.SIZE;
             int column = i % board.SIZE;
-            if(board.getCellColor(row, column) == null && isNeighbour(row,column)){
+            if(board.getCellColor(row, column) == null && isNeighbour(row, column)){
                 board.setCellColor(row, column, color);
+                // Coupure sur victoire : testée avant l'appel récursif, sinon on ne coupe rien.
+                if(isWinningMove(row, column, color)){
+                    board.setCellColor(row, column, null);
+                    if(isMyTurn) return WIN_SCORE + depth;
+                    else return -(WIN_SCORE + depth);
+                }
                 int score = minMax(depth - 1, !(isMyTurn));
                 board.setCellColor(row, column, null);
                 if(isMyTurn ? bestScore < score : bestScore > score){
@@ -169,11 +189,42 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         return myPoints - enemyPoints;
     }
 
-    private boolean isNeighbour(int row,int column){
-        for (int i = row - DIST; i <= row + DIST ; i++) {
-            for (int j = column - DIST; j <= column + DIST ; j++) {
+    /**
+     * Dit si une case est un coup candidat : une pierre (de n'importe quelle couleur)
+     * se trouve à au plus NEIGHBOUR_DISTANCE cases, en ligne et en colonne
+     * (carré de (2 * NEIGHBOUR_DISTANCE + 1)² cases centré sur la case).
+     * Les cases hors plateau sont sautées : !isColor(r, c, null) vaudrait true hors plateau.
+     * On s'arrête dès la première pierre trouvée.
+     */
+    private boolean isNeighbour(int row, int column){
+        for (int i = row - NEIGHBOUR_DISTANCE; i <= row + NEIGHBOUR_DISTANCE; i++) {
+            for (int j = column - NEIGHBOUR_DISTANCE; j <= column + NEIGHBOUR_DISTANCE; j++) {
                 if(!isValid(i) || !isValid(j)) continue;
-                if(!isColor(i,j,null)) return true;
+                if(!isColor(i, j, null)) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Dit si la pierre qu'on vient de poser en (row, column) fait un alignement de WIN_LENGTH.
+     * Seule cette pierre peut créer un nouveau 5 : on ne regarde qu'autour d'elle.
+     * Pour chaque direction, i va de -(WIN_LENGTH - 1) à WIN_LENGTH - 1 (les deux sens) :
+     * le compteur repart à 0 sur une case qui n'est pas de la couleur (la suite doit être
+     * continue) et on teste à chaque case, pour ne pas rater un 5 suivi d'une case vide.
+     */
+    private boolean isWinningMove(int row, int column, CellColor color){
+        int length;
+        for (Direction d : Direction.values()){
+            length = 0;
+            for (int i = -(WIN_LENGTH - 1); i <= WIN_LENGTH - 1; i++) {
+                if(isColor(row + d.getRow() * i, column + d.getColumn() * i, color)){
+                    length++;
+                }
+                else {
+                    length = 0;
+                }
+                if(length >= WIN_LENGTH) return true;
             }
         }
         return false;
