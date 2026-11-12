@@ -187,7 +187,29 @@ Questions :
 2. Quelles feuilles ne sont jamais évaluées ? Pour chaque coupure, donner les valeurs de alpha et bêta au moment du test.
 3. Combien d'appels à `evaluate` sur 12 feuilles ?
 
-Corrigé : à compléter après l'essai.
+Corrigé : racine = 6, l'IA joue C. Coupures : la feuille 9 de A2 (A2 reçoit (−∞, 5), voit 6 : 6 ≥ 5) et tout B2 (B1 reçoit (5, +∞) et vaut 4, donc β de B = 4 ≤ α = 5). 9 appels sur 12. Dans un autre ordre (C2, C1, A, B), seulement 7 : d'où l'intérêt de l'ordre des coups.
+
+### Écriture dans `minMax` (commit 9736deb)
+- Signature `minMax(depth, isMyTurn, alpha, beta)`. `play` lance avec `Integer.MIN_VALUE` et `Integer.MAX_VALUE` (pas `-Integer.MIN_VALUE` : déborde et redonne `MIN_VALUE`).
+- Ordre dans la boucle, après l'appel récursif : retirer la pierre, mettre à jour alpha (mon tour) ou bêta (tour adverse), mettre à jour bestScore, puis `if (alpha >= beta) break;`.
+- Pièges rencontrés : mettre à jour alpha au lieu de bêta au tour adverse ; sortir avant de retirer la pierre (plateau corrompu) ; sortir avant de mettre à jour bestScore (un nœud coupé renverrait ±infini et le parent le choisirait à tort) ; `continue` au lieu de `break` (ne sort pas de la boucle).
+- On renvoie bestScore, jamais alpha ou bêta. Un nœud coupé renvoie une borne (« au moins » / « au plus »), suffisante pour que le parent l'écarte.
+- Les `int` sont passés par copie : un fils qui change son alpha ne change pas celui du parent, seule sa valeur remonte.
+
+### Mesures (test 1, mêmes coups que sans élagage à chaque profondeur)
+- Profondeur 1 : 28 / 40 / 52, inchangé (pas de boucle dans `minMax`, rien à couper).
+- Profondeur 2 : 1 050 / 1 598 / 2 364, inchangé. Raison : `play` passe toujours alpha = `MIN_VALUE`, donc les nœuds MIN de profondeur 1 ne peuvent jamais couper.
+- Profondeur 3 : **17 468 / 30 517 / 33 579** (avant 48 380 / 83 531 / 131 851), soit 2,7 à 3,9 fois moins.
+- Profondeur 4 (même ouverture, l'IA défend : 7 9, 7 8, 9 7, 8 13) : 353 984 / 1 060 563 / 1 459 757 / 2 409 916, contre 2 613 694 / 4 983 757 / 6 688 377 / 3 934 244 sans élagage.
+
+### Version suivante : alpha à la racine
+- Dans `play`, passer `bestScore` comme alpha au lieu de `MIN_VALUE` : la racine est un nœud MAX, son alpha est la valeur du meilleur coup déjà trouvé. Toujours exact (test `score > bestScore` strict : un fils coupé renvoie une borne ≤ bestScore, il n'est jamais choisi).
+- Prévu (harnais, à confirmer par la mesure) : profondeur 2 → 300 / 381 / 352, profondeur 3 → 7 314 / 14 625 / 8 652, profondeur 4 → 132 819 / 307 204 / 207 558 / 1 591 781, mêmes coups.
+
+### Expérience non notée : Min-Max sélectif (branche `selective-depth10`, écrite par Claude)
+- `SelectiveMinMaxPlayer` : tri des candidats par une heuristique locale (attaque + défense), on ne garde que les 3 meilleurs à chaque niveau, profondeur 10. Garde-fou : un coup qui bloque un 5 adverse est toujours gardé. Pas exact.
+- Deux parties contre `MinMaxSimplePlayer` (profondeur 3) : la sélective gagne les deux, en premier (double 4 au 45e coup) et en second (4 ouvert au 60e coup). 17 ms par coup contre 140 à 520 ms, ~30 000 appels contre 2 à 6,6 millions.
+- Leçons : effet d'horizon (à profondeur 3, un double 4 préparé n'est vu qu'une fois inévitable) ; quand tous les coups perdent, ils ont le même score et `play` garde le premier parcouru (coup absurde en coin). Pistes : evaluate qui reconnaît les combinaisons gagnantes (4 ouvert, double 4, 4 + 3 ouvert, double 3 ouvert), prolonger la recherche sur les coups forcés.
 
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
@@ -208,3 +230,7 @@ Pour chaque version, noter le nombre d'appels avant et après.
 | + coups candidats (distance 2) | 3 | 48 380 (1er coup) | non compté | mesuré |
 | + coupure sur victoire | 1 / 2 / 3 | 28 / 1 050 / 48 380 (1er coup) | non compté | identique en début de partie |
 | + coupure sur victoire | 2 | 431 (coup du blocage, test 2) | non compté | 3 021 sans la coupure |
+| + alpha-bêta | 1 / 2 | 28 / 1 050 (1er coup) | non compté | inchangé : la racine ne passe pas son alpha |
+| + alpha-bêta | 3 | 17 468 (1er coup) | non compté | mesuré, mêmes coups (avant 48 380) |
+| + alpha-bêta | 4 | 353 984 (1er coup) | non compté | 2 613 694 sans élagage |
+| + alpha à la racine | 2 / 3 / 4 | 300 / 7 314 / 132 819 (1er coup) | non compté | prévu, à mesurer |

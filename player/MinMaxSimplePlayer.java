@@ -102,7 +102,7 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
                 }
                 // Mon coup est posé : c'est à l'adversaire, il reste DEPTH - 1 niveaux.
                 // Fenêtre alpha-bêta la plus large possible : personne n'est encore sûr de rien.
-                int score = minMax(DEPTH - 1, false, Integer.MIN_VALUE, Integer.MAX_VALUE);
+                int score = minMax(DEPTH - 1, false, bestScore, Integer.MAX_VALUE);
                 board.setCellColor(row, column, null);
                 if(score > bestScore){
                     bestScore = score;
