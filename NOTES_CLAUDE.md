@@ -155,6 +155,40 @@ Test 2, profondeur 2 (tu joues 6 6, 6 8, 5 6, 4 6, 3 6, 7 5, 5 7, 1 4) : l'IA bl
 - Sans la coupure : mêmes coups, mais **3 021** appels pour le coup du blocage. Tout coup qui ne bloque pas est éliminé dès qu'une réponse adverse fait 5, sans évaluer le reste de son sous-arbre.
 - Conclusion : la coupure change peu en début de partie, mais beaucoup dès qu'il y a des menaces (ici 7 fois moins d'appels).
 
+## 1 quinquies. Élagage alpha-bêta (branche `alpha-beta`, 2026-11-12)
+
+### Principe
+- Pendant la recherche, on garde deux bornes, passées en paramètres à chaque appel récursif :
+  - **alpha** : le meilleur score que MAX (l'IA) est déjà sûre d'obtenir sur le chemin actuel (un plancher, il ne fait que monter) ;
+  - **bêta** : le meilleur score que MIN (l'adversaire) est déjà sûr d'obtenir, donc le pire pour l'IA (un plafond, il ne fait que descendre).
+- Au départ : alpha = −∞, bêta = +∞ (en pratique les scores de défaite et de victoire).
+- Nœud MAX : après chaque fils, alpha = max(alpha, valeur du fils). Nœud MIN : bêta = min(bêta, valeur du fils).
+- Dès que **alpha ≥ bêta**, on arrête la boucle des coups de ce nœud : un des deux joueurs a déjà mieux ailleurs, il ne laissera jamais la partie arriver ici.
+- On coupe des branches que **l'un ou l'autre** joueur ne choisira jamais (pas seulement l'adversaire), et on ne les évalue pas du tout.
+- Exemple : un nœud MIN a déjà vu un fils à 2, il vaudra donc **au plus** 2 (on ne connaît pas sa valeur exacte, seulement une borne). Si l'IA a déjà 3 ailleurs, ce nœud ne sera jamais choisi : on saute ses autres fils.
+- **Exact** : on ne coupe que ce qui ne peut pas changer le choix du parent. À même profondeur, l'IA doit jouer les mêmes coups que sans élagage, avec moins d'appels à `evaluate`. (Différent de l'idée « arrêter quand le score baisse trop », qui est une coupure heuristique pouvant se tromper.)
+- Plus les bons coups sont essayés en premier, plus on coupe tôt : d'où l'ordre des coups, version suivante.
+
+### Exercice à la main (profondeur 3)
+Racine = MAX (l'IA), niveau 1 = MIN, niveau 2 = MAX, puis les feuilles (valeurs de `evaluate`), lues de gauche à droite.
+
+```
+                         [MAX racine]
+            /                  |                  \
+         [MIN A]            [MIN B]             [MIN C]
+         /     \            /     \             /     \
+     [MAX A1] [MAX A2]  [MAX B1] [MAX B2]  [MAX C1] [MAX C2]
+      /  \     /  \      /  \     /  \      /  \     /  \
+     3    5   6    9    1    2   8    4    7    4   2    6
+```
+
+Questions :
+1. Quelle valeur remonte à la racine, et quel coup (A, B ou C) l'IA joue-t-elle ?
+2. Quelles feuilles ne sont jamais évaluées ? Pour chaque coupure, donner les valeurs de alpha et bêta au moment du test.
+3. Combien d'appels à `evaluate` sur 12 feuilles ?
+
+Corrigé : à compléter après l'essai.
+
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
 - Coups candidats : uniquement les cases proches des pierres déjà posées.

@@ -11,7 +11,12 @@ import java.awt.*;
 
 /**
  * IA Min-Max pour le Gomoku (plateau SIZE x SIZE, victoire à WIN_LENGTH pierres alignées).
- * Version de base : profondeur 1, toutes les cases vides sont essayées.
+ * Min-Max récursif de profondeur DEPTH, avec trois optimisations qui réduisent le nombre
+ * de nœuds explorés (et donc d'appels à evaluate) :
+ * - coups candidats : seules les cases proches d'une pierre sont essayées ;
+ * - coupure sur victoire : un coup qui fait 5 termine la recherche dans sa branche ;
+ * - élagage alpha-bêta : on arrête d'explorer un nœud dès qu'on a la preuve qu'un des
+ *   deux joueurs ne le choisira jamais. Exact : le coup choisi ne change pas.
  */
 public class MinMaxSimplePlayer extends AbstractPlayer {
     // Nombre de pierres alignées pour gagner.
@@ -96,7 +101,8 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
                     return new Coords(row, column);
                 }
                 // Mon coup est posé : c'est à l'adversaire, il reste DEPTH - 1 niveaux.
-                int score = minMax(DEPTH - 1, false);
+                // Fenêtre alpha-bêta la plus large possible : personne n'est encore sûr de rien.
+                int score = minMax(DEPTH - 1, false, Integer.MIN_VALUE, Integer.MAX_VALUE);
                 board.setCellColor(row, column, null);
                 if(score > bestScore){
                     bestScore = score;
@@ -116,10 +122,20 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
      * Si un coup fait 5, la partie est finie : on ne descend pas plus bas et on renvoie
      * WIN_SCORE + depth (victoire) ou -(WIN_SCORE + depth) (défaite). Plus depth est grand,
      * plus la fin est proche : l'IA préfère gagner vite et perdre le plus tard possible.
+     * Élagage alpha-bêta : après chaque fils, le joueur de ce niveau met à jour sa borne
+     * (alpha si c'est moi, bêta si c'est l'adversaire). Si alpha >= bêta, un des deux joueurs
+     * a déjà mieux ailleurs et ne laissera jamais la partie arriver ici : on arrête la boucle.
+     * La valeur renvoyée est alors une borne (au moins / au plus), pas la valeur exacte,
+     * mais elle suffit au parent pour écarter ce coup.
      * @param depth nombre de demi-coups restant à explorer
      * @param isMyTurn vrai si c'est à l'IA de poser une pierre à ce niveau
+     * @param alpha meilleur score que l'IA est déjà sûre d'obtenir sur le chemin actuel
+     *              (plancher, ne fait que monter)
+     * @param beta meilleur score que l'adversaire est déjà sûr d'obtenir sur le chemin actuel,
+     *             donc le pire pour l'IA (plafond, ne fait que descendre)
+     * @return score de la position, ou une borne si la boucle a été coupée
      */
-    private int minMax(int depth, boolean isMyTurn){
+    private int minMax(int depth, boolean isMyTurn, int alpha, int beta){
         int bestScore;
         CellColor color;
         if(depth == 0) return evaluate(isMyTurn);
@@ -144,11 +160,23 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
                     if(isMyTurn) return WIN_SCORE + depth;
                     else return -(WIN_SCORE + depth);
                 }
-                int score = minMax(depth - 1, !(isMyTurn));
+                // Le fils reçoit les bornes actuelles. Ce sont des copies (int) :
+                // ce qu'il en fait ne modifie pas les nôtres, seule sa valeur remonte.
+                int score = minMax(depth - 1, !(isMyTurn), alpha, beta);
+                // Pierre retirée avant toute sortie de boucle, pour rendre le plateau intact.
                 board.setCellColor(row, column, null);
+                // MAX remonte son plancher, MIN baisse son plafond.
+                if(isMyTurn) alpha = Math.max(score, alpha);
+                else beta = Math.min(score, beta);
+                // bestScore mis à jour avant la coupure : le score qui provoque la coupure
+                // doit être pris en compte, sinon on renverrait la valeur de départ (±infini).
                 if(isMyTurn ? bestScore < score : bestScore > score){
                     bestScore = score;
                 }
+                // Coupure alpha-bêta : fenêtre vide, les coups restants ne peuvent pas
+                // changer le choix du parent.
+                if(alpha >= beta) break;
+
             }
         }
         return bestScore;
