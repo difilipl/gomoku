@@ -9,6 +9,7 @@ import fr.esisar.in450.gomoku.player.BasicAIPlayer;
 import fr.esisar.in450.gomoku.player.DummyPlayer;
 import fr.esisar.in450.gomoku.player.HumanPlayer;
 import fr.esisar.in450.gomoku.player.MinMaxSimplePlayer;
+import fr.esisar.in450.gomoku.player.SelectiveMinMaxPlayer;
 
 
 /**
@@ -20,7 +21,8 @@ public class Game
 {
 	public static void main(String[] args)
 	{
-		ex1();
+		exSelectiveVsExact();
+		//ex1();
 		// ex2();
 		// ...
 	}
@@ -34,6 +36,22 @@ public class Game
 	}
 	
 	
+	/**
+	 * Expérience (branche selective-depth10) : IA sélective profondeur 10 contre un humain.
+	 */
+	public static void exSelective()
+	{
+		new LocalGameManager().startMatch(new SelectiveMinMaxPlayer(), new MinMaxSimplePlayer());
+	}
+
+	/**
+	 * Expérience : IA sélective profondeur 10 contre l'IA exacte MinMaxSimplePlayer.
+	 */
+	public static void exSelectiveVsExact()
+	{
+		new LocalGameManager().startMatch(new MinMaxSimplePlayer(), new SelectiveMinMaxPlayer());
+	}
+
 	/**
 	 * Exemple 2 : permet de faire une partie en local entre deux IA basiques  
 	 */
