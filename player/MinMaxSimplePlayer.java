@@ -81,6 +81,8 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
      */
     private static final boolean ORDERING_OWNER_MOVES_NEXT = false;
 
+    private Coords[] killerMoves = new Coords[DEPTH];
+
     /**
      * Choisit le coup à jouer.
      * Plateau vide : on joue au centre, la case qui offre le plus d'alignements.
@@ -150,6 +152,7 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
      * @return score de la position, ou une borne si la boucle a été coupée
      */
     private int minMax(int depth, boolean isMyTurn, int alpha, int beta){
+
         int bestScore;
         CellColor color;
         if(depth == 0) return evaluate(isMyTurn);
@@ -163,33 +166,27 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
             color = getEnemyColor();
         }
         ArrayList<ScoredMove> moves = orderedMoves(color);
-
+        moveKillerFirst(moves, killerMoves[depth - 1]);
         for (ScoredMove move : moves ){
             int row = move.coords.row;
             int column = move.coords.col;
             board.setCellColor(row, column, color);
-            // Coupure sur victoire : testée avant l'appel récursif, sinon on ne coupe rien.
             if(isWinningMove(row, column, color)){
                 board.setCellColor(row, column, null);
                 if(isMyTurn) return WIN_SCORE + depth;
                 else return -(WIN_SCORE + depth);
             }
-            // Le fils reçoit les bornes actuelles. Ce sont des copies (int) :
-            // ce qu'il en fait ne modifie pas les nôtres, seule sa valeur remonte.
             int score = minMax(depth - 1, !(isMyTurn), alpha, beta);
-            // Pierre retirée avant toute sortie de boucle, pour rendre le plateau intact.
             board.setCellColor(row, column, null);
-            // MAX remonte son plancher, MIN baisse son plafond.
             if(isMyTurn) alpha = Math.max(score, alpha);
             else beta = Math.min(score, beta);
-            // bestScore mis à jour avant la coupure : le score qui provoque la coupure
-            // doit être pris en compte, sinon on renverrait la valeur de départ (±infini).
             if(isMyTurn ? bestScore < score : bestScore > score){
                 bestScore = score;
             }
-            // Coupure alpha-bêta : fenêtre vide, les coups restants ne peuvent pas
-            // changer le choix du parent.
-            if(alpha >= beta) break;
+            if(alpha >= beta){
+                killerMoves[depth - 1] = new Coords(row, column);
+                break;
+            }
 
 
         }
@@ -231,7 +228,17 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         return myPoints - enemyPoints;
     }
 
-
+    private void moveKillerFirst(ArrayList<ScoredMove> moves,Coords killer){
+        int indice = 0;
+        if(killer == null) return;
+        for(int i = 0; i < moves.size(); i++){
+            if(moves.get(i).coords.col == killer.col && moves.get(i).coords.row == killer.row){
+                indice = i;
+            }
+        }
+        ScoredMove scoremove = moves.remove(indice);
+        moves.addFirst(scoremove);
+    }
 
     /**
      * Liste des coups candidats (case vide proche d'une pierre), triée par note locale
