@@ -58,6 +58,12 @@ public class SidePanel extends JPanel
 	private static final int SPINNER_FRAME_MS = 40;
 	/** Durée d'un tour complet de l'indicateur de réflexion. */
 	private static final int SPINNER_TURN_MS = 900;
+	/** Nombre de boutons de mode par ligne. */
+	private static final int MODES_PER_ROW = 2;
+	/** Espace entre deux boutons de mode. */
+	private static final int MODE_GAP = 6;
+	/** Hauteur d'un bouton de mode. */
+	private static final int MODE_BUTTON_HEIGHT = 36;
 	/** Texte du bouton quand les numéros sont cachés. */
 	private static final String NUMBERS_OFF = "Afficher n°";
 	/** Texte du bouton quand les numéros sont affichés. */
@@ -119,7 +125,8 @@ public class SidePanel extends JPanel
 
 		add(left(section("MODE DE JEU")));
 		add(Box.createVerticalStrut(8));
-		JPanel modeRow = new JPanel(new GridLayout(1, GameMode.values().length, 6, 0));
+		int modeRows = (GameMode.values().length + MODES_PER_ROW - 1) / MODES_PER_ROW;
+		JPanel modeRow = new JPanel(new GridLayout(modeRows, MODES_PER_ROW, MODE_GAP, MODE_GAP));
 		modeRow.setOpaque(false);
 		for (GameMode mode : GameMode.values())
 		{
@@ -129,7 +136,7 @@ public class SidePanel extends JPanel
 			modeButtons.put(mode, button);
 			modeRow.add(button);
 		}
-		modeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+		modeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, modeRows * MODE_BUTTON_HEIGHT + (modeRows - 1) * MODE_GAP));
 		add(left(modeRow));
 		add(Box.createVerticalStrut(18));
 
@@ -320,6 +327,7 @@ public class SidePanel extends JPanel
 		{
 			this.color = color;
 			setPreferredSize(new Dimension(WIDTH - 2 * PADDING, CARD_HEIGHT));
+			setMinimumSize(new Dimension(0, CARD_HEIGHT));
 			setMaximumSize(new Dimension(Integer.MAX_VALUE, CARD_HEIGHT));
 			setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 			setToolTipText("Cliquer pour choisir le joueur");

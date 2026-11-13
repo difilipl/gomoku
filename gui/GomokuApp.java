@@ -85,16 +85,18 @@ public class GomokuApp
 
 	/**
 	 * Applique un mode de jeu et lance la partie tout de suite.
-	 * L'humain garde sa couleur actuelle (les Blancs s'il n'y avait pas d'humain).
+	 * Les couleurs restent dans le même sens qu'avant quand c'est possible :
+	 * l'humain garde sa couleur, et une partie IA contre IA déjà inversée le reste.
 	 */
 	private void onModeChosen(GameMode mode)
 	{
-		boolean humanIsBlack = sidePanel.getSelection(CellColor.BLACK).isHuman()
-				&& !sidePanel.getSelection(CellColor.WHITE).isHuman();
-		CellColor humanColor = humanIsBlack ? CellColor.BLACK : CellColor.WHITE;
-		CellColor opponentColor = humanIsBlack ? CellColor.WHITE : CellColor.BLACK;
-		sidePanel.setSelection(humanColor, PlayerType.HUMAN);
-		sidePanel.setSelection(opponentColor, mode.getOpponent());
+		PlayerType white = sidePanel.getSelection(CellColor.WHITE);
+		PlayerType black = sidePanel.getSelection(CellColor.BLACK);
+		boolean keepSwapped = mode.matches(white, black) && white == mode.getSecond();
+		boolean humanWasBlack = black.isHuman() && !white.isHuman();
+		boolean swapped = keepSwapped || (mode.getFirst().isHuman() && humanWasBlack);
+		sidePanel.setSelection(CellColor.WHITE, swapped ? mode.getSecond() : mode.getFirst());
+		sidePanel.setSelection(CellColor.BLACK, swapped ? mode.getFirst() : mode.getSecond());
 		newGame();
 	}
 
