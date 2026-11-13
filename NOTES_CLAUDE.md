@@ -240,6 +240,17 @@ Corrigé : racine = 6, l'IA joue C. Coupures : la feuille 9 de A2 (A2 reçoit (�
 - Profondeur 5 (exacte) : **65 215 / 116 158 / 113 628 / 4 198** appels, 160 à 220 ms par coup. Coups : 7 9, 7 8, 9 8, 8 13 (comme à la profondeur 4). Meilleurs scores : 990 / 1 021 / 1 120 / 2 020.
 - Conséquence : la profondeur 4 passe de plusieurs secondes à quelques dizaines de millisecondes, et la profondeur 5 exacte devient jouable (moins d'un quart de seconde par coup), alors qu'elle était hors de portée sans l'ordre des coups.
 
+## 1 septies. evaluate qui reconnaît les combinaisons (branche `combo-eval`, 2026-11-13)
+- Problème vu dans le match en second : le barème note chaque suite séparément. Un 4 bloqué d'un côté + un 3 ouvert vaut ~2 000 points, alors que c'est aussi gagnant qu'un 4 ouvert (100 000) : l'adversaire ne peut bloquer qu'une des deux menaces.
+- Dans `evaluate`, on garde le `Sequence` de chaque suite et on compte par joueur : les 4 (`FOUR_LENGTH`, au moins une extrémité libre) et les 3 ouverts (`THREE_LENGTH`, deux extrémités libres). Après la boucle, `comboBonus(fours, openThrees)` :
+  - au moins deux 4, ou un 4 et un 3 ouvert → `FOUR_THREE_BONUS = 100 000` (aussi fort qu'un 4 ouvert) ;
+  - sinon au moins deux 3 ouverts → `DOUBLE_THREE_BONUS = 10 000` (gagne un coup plus tard, et seulement si l'adversaire n'a pas de 4).
+  Les deux restent sous `WIN_SCORE` et sous 500 000 (un 4 dont le propriétaire joue = victoire immédiate).
+- Coût : quelques compteurs et `if` dans la boucle existante, le nombre d'appels ne change pas.
+- Limite : les lignes trouées (`X X _ X`) ne sont pas encore reconnues (le comptage les coupe en deux).
+- Test 1, profondeur 5 : mêmes appels et mêmes coups qu'avant (65 215 / 116 158 / 113 628 / 4 198 ; pas de combinaison en début de partie). Au 4e coup, meilleur score 12 020 au lieu de 2 020 : le double 3 ouvert est reconnu (+10 000).
+- À mesurer : match en second contre la sélective.
+
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
 - Coups candidats : uniquement les cases proches des pierres déjà posées.
