@@ -204,12 +204,41 @@ Corrigé : racine = 6, l'IA joue C. Coupures : la feuille 9 de A2 (A2 reçoit (�
 
 ### Version suivante : alpha à la racine
 - Dans `play`, passer `bestScore` comme alpha au lieu de `MIN_VALUE` : la racine est un nœud MAX, son alpha est la valeur du meilleur coup déjà trouvé. Toujours exact (test `score > bestScore` strict : un fils coupé renvoie une borne ≤ bestScore, il n'est jamais choisi).
-- Prévu (harnais, à confirmer par la mesure) : profondeur 2 → 300 / 381 / 352, profondeur 3 → 7 314 / 14 625 / 8 652, profondeur 4 → 132 819 / 307 204 / 207 558 / 1 591 781, mêmes coups.
+- Prévu au harnais puis confirmé par mec : profondeur 2 → 300 / 381 / 352, profondeur 3 → 7 314 / 14 625 / 8 652, profondeur 4 → 132 819 / 307 204 / 207 558 / 1 591 781, mêmes coups (commit 0b0bdd0).
 
 ### Expérience non notée : Min-Max sélectif (branche `selective-depth10`, écrite par Claude)
 - `SelectiveMinMaxPlayer` : tri des candidats par une heuristique locale (attaque + défense), on ne garde que les 3 meilleurs à chaque niveau, profondeur 10. Garde-fou : un coup qui bloque un 5 adverse est toujours gardé. Pas exact.
 - Deux parties contre `MinMaxSimplePlayer` (profondeur 3) : la sélective gagne les deux, en premier (double 4 au 45e coup) et en second (4 ouvert au 60e coup). 17 ms par coup contre 140 à 520 ms, ~30 000 appels contre 2 à 6,6 millions.
 - Leçons : effet d'horizon (à profondeur 3, un double 4 préparé n'est vu qu'une fois inévitable) ; quand tous les coups perdent, ils ont le même score et `play` garde le premier parcouru (coup absurde en coin). Pistes : evaluate qui reconnaît les combinaisons gagnantes (4 ouvert, double 4, 4 + 3 ouvert, double 3 ouvert), prolonger la recherche sur les coups forcés.
+
+## 1 sexies. Ordre des coups (branche `move-ordering`, 2026-11-13)
+
+### Principe
+- L'alpha-bêta coupe d'autant plus que le meilleur coup est essayé en premier : alpha et bêta sont bons dès le premier fils, et les frères suivants sont coupés tout de suite. Dans le meilleur cas, on passe d'environ b^d feuilles à environ b^(d/2).
+- L'ordre ne change que la vitesse : on essaie exactement les mêmes coups candidats, la valeur trouvée est la même. Seule exception : si deux coups ont exactement le même score, `play` garde le premier rencontré, qui peut changer avec l'ordre (coup différent, même valeur).
+- On ne trie pas avec `evaluate` (elle lit tout le plateau : trop cher pour chaque candidat de chaque nœud), mais avec une note **locale** de la case.
+
+### Note d'un coup (`moveScore`, `lineThrough`)
+- `lineThrough(row, column, color, d)` : la suite de `color` qui passerait par la case si `color` y jouait. On part de la case (comptée pour 1, sans y poser la pierre) et on avance de chaque côté (d puis -d) tant que c'est `color` ; la case où l'on s'arrête donne l'extrémité : libre si vide, fermée si pierre adverse ou bord. Deux boucles séparées, car les deux côtés n'ont pas la même longueur. Gère les lignes avec un trou comblé par le coup (X X _ X → 4).
+- `moveScore = attaque + défense` sur les 4 directions, chaque suite notée par `scoreSequence` :
+  - attaque : la suite que je ferais en jouant là ;
+  - défense : la suite que l'adversaire ferait s'il jouait là (en prenant la case, je la lui enlève). Sans la défense, la case qui bloque un 4 adverse serait notée presque 0 et essayée en dernier.
+- `ownerMovesNext` : constante `ORDERING_OWNER_MOVES_NEXT = false` pour l'attaque et la défense. Après le coup de `color`, c'est l'adversaire qui joue ; et une seule valeur pour toutes les cases garde un tri cohérent, quel que soit le joueur du nœud. (Une version avec `playerColor == color` notait l'attaque et la défense avec des barèmes différents selon que le nœud était à l'IA ou à l'humain.)
+- L'adversaire de `color` se calcule à part (`otherColor`) : `getEnemyColor()` donne l'adversaire de l'IA, pas celui de `color`.
+
+### Liste triée (`orderedMoves`)
+- Record `ScoredMove(Coords coords, int score)`, privé dans `MinMaxSimplePlayer` (seule classe qui s'en sert).
+- Pourquoi pas une `Map` : avec le score comme clé, deux cases de même score s'écrasent ; avec la case comme clé, une `HashMap` n'a pas d'ordre. On n'a jamais besoin de chercher par clé, seulement de parcourir dans l'ordre : une liste de records triée suffit.
+- `orderedMoves(color)` : même filtre que les anciennes boucles (case vide et `isNeighbour`), un `ScoredMove` par candidat, tri par score décroissant (`Comparator.comparingInt(ScoredMove::score).reversed()`).
+- La liste est une **variable locale** de `minMax` et de `play`, pas un attribut : sinon l'appel récursif du niveau en dessous l'écraserait pendant que le niveau courant la parcourt.
+- Coût : le parcours du plateau remplace celui des anciennes boucles ; le surcoût est la note des ~30 candidats (8 `lineThrough` chacun). Les feuilles (profondeur 0) renvoient `evaluate` sans chercher de coups, donc ne trient pas : le tri ne touche que les nœuds internes, environ 30 fois moins nombreux.
+
+### Mesures (test 1 : IA au centre, Noir 8 9, 8 10, 8 11, 8 12)
+- Profondeur 3 : **1 181 / 1 918 / 2 446** (avant 7 314 / 14 625 / 8 652), soit 3,5 à 7,6 fois moins ; ~10 ms par coup. IA : 7 9, 6 10, 5 11, 4 12 (gagne, Noir ne bloque pas).
+- Profondeur 4 : **4 256 / 7 968 / 8 643 / 3 415** (avant 132 819 / 307 204 / 207 558 / 1 591 781), soit 24 à 466 fois moins ; 40 à 60 ms par coup. Meilleurs scores : 0 / 20 / 120 / 220.
+- Coups à la profondeur 4 : 7 9, 7 8, **9 8**, 8 13, contre 7 9, 7 8, **9 7**, 8 13 avant. Le 3e coup diffère : cas d'égalité attendu (même score, autre coup rencontré en premier) — à confirmer en affichant le score de 9 7 et 9 8.
+- Profondeur 5 (exacte) : **65 215 / 116 158 / 113 628 / 4 198** appels, 160 à 220 ms par coup. Coups : 7 9, 7 8, 9 8, 8 13 (comme à la profondeur 4). Meilleurs scores : 990 / 1 021 / 1 120 / 2 020.
+- Conséquence : la profondeur 4 passe de plusieurs secondes à quelques dizaines de millisecondes, et la profondeur 5 exacte devient jouable (moins d'un quart de seconde par coup), alors qu'elle était hors de portée sans l'ordre des coups.
 
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.
@@ -233,4 +262,7 @@ Pour chaque version, noter le nombre d'appels avant et après.
 | + alpha-bêta | 1 / 2 | 28 / 1 050 (1er coup) | non compté | inchangé : la racine ne passe pas son alpha |
 | + alpha-bêta | 3 | 17 468 (1er coup) | non compté | mesuré, mêmes coups (avant 48 380) |
 | + alpha-bêta | 4 | 353 984 (1er coup) | non compté | 2 613 694 sans élagage |
-| + alpha à la racine | 2 / 3 / 4 | 300 / 7 314 / 132 819 (1er coup) | non compté | prévu, à mesurer |
+| + alpha à la racine | 2 / 3 / 4 | 300 / 7 314 / 132 819 (1er coup) | non compté | mesuré, mêmes coups |
+| + ordre des coups | 3 | 1 181 (1er coup) | non compté | mesuré (avant 7 314), ~10 ms/coup |
+| + ordre des coups | 4 | 4 256 (1er coup) | non compté | mesuré (avant 132 819), 40-60 ms/coup ; 3e coup différent (égalité ?) |
+| + ordre des coups | 5 | 65 215 (1er coup) | non compté | mesuré, 160-220 ms/coup |

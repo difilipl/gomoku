@@ -6,7 +6,8 @@ import fr.esisar.in450.gomoku.gamecore.enums.Direction;
 import fr.esisar.in450.gomoku.gamecore.model.Coords;
 import fr.esisar.in450.gomoku.player.utils.Sequence;
 
-import java.awt.*;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 
 /**
@@ -19,6 +20,11 @@ import java.awt.*;
  *   deux joueurs ne le choisira jamais. Exact : le coup choisi ne change pas.
  */
 public class MinMaxSimplePlayer extends AbstractPlayer {
+
+    /** Un coup candidat et sa note locale, utilisée pour trier les coups (ordre des coups). */
+    private record ScoredMove(Coords coords, int score){}
+
+
     // Nombre de pierres alignées pour gagner.
     private static final int WIN_LENGTH = 5;
     // Une suite a au plus deux extrémités.
@@ -62,18 +68,25 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
     private int totalEvaluations = 0;
 
     // Profondeur du Min-Max : nombre de demi-coups explorés (mon coup compte pour 1).
-    private static final int DEPTH = 3;
+    private static final int DEPTH = 5;
 
     // Coups candidats : une case vide n'est essayée que si une pierre se trouve
     // à au plus NEIGHBOUR_DISTANCE cases d'elle, en ligne et en colonne.
     private static final int NEIGHBOUR_DISTANCE = 2;
 
     /**
+     * Valeur de ownerMovesNext pour noter un coup dans l'ordre des coups : après le coup
+     * de color, c'est l'adversaire qui joue. La même valeur sert pour l'attaque et la défense,
+     * pour que toutes les cases soient notées avec le même barème et que le tri reste cohérent.
+     */
+    private static final boolean ORDERING_OWNER_MOVES_NEXT = false;
+
+    /**
      * Choisit le coup à jouer.
      * Plateau vide : on joue au centre, la case qui offre le plus d'alignements.
-     * Sinon : on parcourt les SIZE * SIZE cases avec un seul indice i
-     * (ligne = i / SIZE, colonne = i % SIZE) et on n'essaie que les coups candidats
-     * (case vide proche d'une pierre). Un coup qui fait 5 est joué tout de suite.
+     * Sinon : on n'essaie que les coups candidats (case vide proche d'une pierre),
+     * dans l'ordre donné par orderedMoves (meilleure note locale d'abord, pour couper plus tôt).
+     * Un coup qui fait 5 est joué tout de suite.
      * Pour les autres : poser la pierre, lancer minMax, retirer la pierre,
      * garder le meilleur coup.
      */
@@ -88,35 +101,36 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
             int center = (board.SIZE - 1) / 2;
             return new Coords(center, center);
         }
+        ArrayList<ScoredMove> moves = orderedMoves(playerColor);
 
-        for (int i = 0; i < board.SIZE * board.SIZE; i++){
-            int row = i / board.SIZE;
-            int column = i % board.SIZE;
-            // Case vide testée d'abord : c'est le test le moins cher.
-            if(board.getCellColor(row, column) == null && isNeighbour(row, column)){
-                board.setCellColor(row, column, playerColor);
-                // Coup gagnant : rien ne peut faire mieux, on le joue sans chercher plus loin.
-                if(isWinningMove(row, column, playerColor)){
-                    board.setCellColor(row, column, null);
-                    return new Coords(row, column);
-                }
-                // Mon coup est posé : c'est à l'adversaire, il reste DEPTH - 1 niveaux.
-                // Fenêtre alpha-bêta la plus large possible : personne n'est encore sûr de rien.
-                int score = minMax(DEPTH - 1, false, bestScore, Integer.MAX_VALUE);
+        for (ScoredMove move : moves ){
+            int row = move.coords.row;
+            int column = move.coords.col;
+
+            board.setCellColor(row, column, playerColor);
+            // Coup gagnant : rien ne peut faire mieux, on le joue sans chercher plus loin.
+            if(isWinningMove(row, column, playerColor)){
                 board.setCellColor(row, column, null);
-                if(score > bestScore){
-                    bestScore = score;
-                    bestMove = new Coords(row, column);
-                }
+                return new Coords(row, column);
             }
+            // Mon coup est posé : c'est à l'adversaire, il reste DEPTH - 1 niveaux.
+            // Fenêtre alpha-bêta la plus large possible : personne n'est encore sûr de rien.
+            int score = minMax(DEPTH - 1, false, bestScore, Integer.MAX_VALUE);
+            board.setCellColor(row, column, null);
+            if(score > bestScore){
+                bestScore = score;
+                bestMove = new Coords(row, column);
+            }
+
         }
-        System.out.println("Appels à evaluate : " + moveEvaluations + " ce coup, " + totalEvaluations + " depuis le début");
+        System.out.println("Appels à evaluate : " + moveEvaluations + " ce coup, " + totalEvaluations + " depuis le début, meilleur score : " + bestScore);
         return bestMove;
     }
 
     /**
      * Score du plateau, du point de vue de l'IA, en explorant encore depth demi-coups.
-     * Profondeur 0 : on évalue le plateau. Sinon, on essaie chaque coup candidat :
+     * Profondeur 0 : on évalue le plateau. Sinon, on essaie chaque coup candidat,
+     * dans l'ordre donné par orderedMoves (les meilleurs d'abord, pour que l'alpha-bêta coupe plus tôt) :
      * à mon tour je garde le plus grand score, au tour adverse le plus petit
      * (l'adversaire choisit le coup le pire pour moi).
      * Si un coup fait 5, la partie est finie : on ne descend pas plus bas et on renvoie
@@ -148,36 +162,36 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
             bestScore = Integer.MAX_VALUE;
             color = getEnemyColor();
         }
+        ArrayList<ScoredMove> moves = orderedMoves(color);
 
-        for (int i = 0; i < board.SIZE * board.SIZE; i++){
-            int row = i / board.SIZE;
-            int column = i % board.SIZE;
-            if(board.getCellColor(row, column) == null && isNeighbour(row, column)){
-                board.setCellColor(row, column, color);
-                // Coupure sur victoire : testée avant l'appel récursif, sinon on ne coupe rien.
-                if(isWinningMove(row, column, color)){
-                    board.setCellColor(row, column, null);
-                    if(isMyTurn) return WIN_SCORE + depth;
-                    else return -(WIN_SCORE + depth);
-                }
-                // Le fils reçoit les bornes actuelles. Ce sont des copies (int) :
-                // ce qu'il en fait ne modifie pas les nôtres, seule sa valeur remonte.
-                int score = minMax(depth - 1, !(isMyTurn), alpha, beta);
-                // Pierre retirée avant toute sortie de boucle, pour rendre le plateau intact.
+        for (ScoredMove move : moves ){
+            int row = move.coords.row;
+            int column = move.coords.col;
+            board.setCellColor(row, column, color);
+            // Coupure sur victoire : testée avant l'appel récursif, sinon on ne coupe rien.
+            if(isWinningMove(row, column, color)){
                 board.setCellColor(row, column, null);
-                // MAX remonte son plancher, MIN baisse son plafond.
-                if(isMyTurn) alpha = Math.max(score, alpha);
-                else beta = Math.min(score, beta);
-                // bestScore mis à jour avant la coupure : le score qui provoque la coupure
-                // doit être pris en compte, sinon on renverrait la valeur de départ (±infini).
-                if(isMyTurn ? bestScore < score : bestScore > score){
-                    bestScore = score;
-                }
-                // Coupure alpha-bêta : fenêtre vide, les coups restants ne peuvent pas
-                // changer le choix du parent.
-                if(alpha >= beta) break;
-
+                if(isMyTurn) return WIN_SCORE + depth;
+                else return -(WIN_SCORE + depth);
             }
+            // Le fils reçoit les bornes actuelles. Ce sont des copies (int) :
+            // ce qu'il en fait ne modifie pas les nôtres, seule sa valeur remonte.
+            int score = minMax(depth - 1, !(isMyTurn), alpha, beta);
+            // Pierre retirée avant toute sortie de boucle, pour rendre le plateau intact.
+            board.setCellColor(row, column, null);
+            // MAX remonte son plancher, MIN baisse son plafond.
+            if(isMyTurn) alpha = Math.max(score, alpha);
+            else beta = Math.min(score, beta);
+            // bestScore mis à jour avant la coupure : le score qui provoque la coupure
+            // doit être pris en compte, sinon on renverrait la valeur de départ (±infini).
+            if(isMyTurn ? bestScore < score : bestScore > score){
+                bestScore = score;
+            }
+            // Coupure alpha-bêta : fenêtre vide, les coups restants ne peuvent pas
+            // changer le choix du parent.
+            if(alpha >= beta) break;
+
+
         }
         return bestScore;
     }
@@ -216,6 +230,98 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
         }
         return myPoints - enemyPoints;
     }
+
+
+
+    /**
+     * Liste des coups candidats (case vide proche d'une pierre), triée par note locale
+     * décroissante (moveScore). Ordre des coups : essayer les meilleurs coups d'abord
+     * fait couper l'alpha-bêta plus tôt. On essaie les mêmes coups qu'avant, seul l'ordre change.
+     * @param color couleur du joueur qui joue à ce niveau
+     * @return les coups candidats, du plus prometteur au moins prometteur
+     */
+    private ArrayList<ScoredMove> orderedMoves(CellColor color){
+        ArrayList<ScoredMove> moves = new ArrayList<>();
+        for (int i = 0; i < board.SIZE * board.SIZE; i++){
+            int row = i / board.SIZE;
+            int column = i % board.SIZE;
+            if(board.getCellColor(row, column) == null && isNeighbour(row, column)){
+                ScoredMove move = new ScoredMove(new Coords(row, column), moveScore(row, column, color));
+                moves.add(move);
+            }
+        }
+        moves.sort(Comparator.comparingInt(ScoredMove::score).reversed());
+        return moves;
+    }
+
+    /**
+     * Mesure la suite de pierres de color qui passerait par la case (row, column)
+     * si color y jouait, dans la direction d (des deux côtés de la case).
+     * Sert à noter un coup pour l'ordre des coups, sans parcourir tout le plateau.
+     * La case elle-même compte pour 1, donc pas besoin d'y poser la pierre.
+     * Une extrémité est libre si la case où l'on s'arrête est vide, fermée sinon
+     * (pierre adverse ou bord).
+     *
+     * @param row ligne de la case (vide)
+     * @param column colonne de la case
+     * @param color couleur dont on mesure la suite
+     * @param d direction de la ligne ; on avance dans le sens d puis dans le sens -d
+     * @return longueur de la suite (case comprise) et nombre d'extrémités libres
+     */
+    private Sequence lineThrough(int row, int column, CellColor color, Direction d){
+        int lenth = 1;
+        int openEnds = 0;
+        for (int i = 1; i <= WIN_LENGTH - 1; i++) {
+            if(isColor(row + d.getRow() * i, column + d.getColumn() * i, color)){
+                lenth++;
+            }
+            else if(isColor(row + d.getRow() * i, column + d.getColumn() * i, null)) {
+                openEnds++;
+                break;
+            }
+            else {
+                break;
+            }
+        }
+        for (int i = -1; i >= -(WIN_LENGTH - 1); i--) {
+            if(isColor(row + d.getRow() * i, column + d.getColumn() * i, color)){
+                lenth++;
+            }
+            else if(isColor(row + d.getRow() * i, column + d.getColumn() * i, null)) {
+                openEnds++;
+                break;
+            }
+            else {
+                break;
+            }
+        }
+        return new Sequence(lenth,openEnds);
+    }
+
+
+    /**
+     * Note locale d'un coup, pour l'ordre des coups (sans parcourir tout le plateau).
+     * Attaque : les suites que color ferait en jouant là. Défense : les suites que
+     * l'adversaire ferait s'il jouait là (en prenant la case, on les lui enlève).
+     * On additionne les deux sur les 4 directions.
+     * @param row ligne de la case (vide)
+     * @param column colonne de la case
+     * @param color couleur du joueur qui jouerait ce coup
+     * @return la note du coup, plus elle est grande plus le coup est prometteur
+     */
+    private int moveScore(int row, int column, CellColor color){
+        int res = 0;
+        CellColor otherColor = color == getEnemyColor() ? playerColor : getEnemyColor();
+        for (Direction d : Direction.values()) {
+            Sequence s = lineThrough(row,column,color,d);
+            res += scoreSequence(s, ORDERING_OWNER_MOVES_NEXT);
+            Sequence s2 = lineThrough(row,column,otherColor,d);
+            res += scoreSequence(s2, ORDERING_OWNER_MOVES_NEXT);
+        }
+        return res;
+    }
+
+
 
     /**
      * Dit si une case est un coup candidat : une pierre (de n'importe quelle couleur)
