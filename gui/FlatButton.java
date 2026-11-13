@@ -1,5 +1,6 @@
 package fr.esisar.in450.gomoku.gui;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -25,6 +26,8 @@ public class FlatButton extends JButton
 	private static final float HOVER_BRIGHTEN = 0.12f;
 	/** Assombrissement au clic. */
 	private static final float PRESS_DARKEN = 0.15f;
+	/** Épaisseur de la bordure d'un bouton sélectionné. */
+	private static final float SELECTED_BORDER = 2f;
 
 	private final Color background;
 	private final Color foreground;
@@ -72,6 +75,12 @@ public class FlatButton extends JButton
 		}
 		g.setColor(fill);
 		g.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), CORNER, CORNER));
+		if (isSelected())
+		{
+			g.setColor(Theme.ACCENT);
+			g.setStroke(new BasicStroke(SELECTED_BORDER));
+			g.draw(new RoundRectangle2D.Double(1, 1, getWidth() - 2, getHeight() - 2, CORNER, CORNER));
+		}
 
 		g.setFont(getFont());
 		FontMetrics metrics = g.getFontMetrics();

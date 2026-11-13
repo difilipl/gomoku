@@ -68,6 +68,8 @@ public class SidePanel extends JPanel
 	private final Map<CellColor, PlayerType> selection = new EnumMap<>(CellColor.class);
 	private final Map<CellColor, PlayerCard> cards = new EnumMap<>(CellColor.class);
 	private final BiConsumer<CellColor, PlayerType> onPlayerChanged;
+	private final Consumer<GameMode> onModeChosen;
+	private final Map<GameMode, FlatButton> modeButtons = new EnumMap<>(GameMode.class);
 	private final JLabel statusLabel = new JLabel(" ");
 	private final JLabel pendingLabel = new JLabel(" ");
 	private final FlatButton undoButton;
@@ -87,13 +89,16 @@ public class SidePanel extends JPanel
 	 * @param onSwap          appelé par le bouton qui échange les couleurs
 	 * @param onPlayerChanged appelé quand l'utilisateur choisit un autre type de joueur
 	 * @param onNumbersToggle appelé avec le nouvel état de l'affichage des numéros
+	 * @param onModeChosen    appelé quand l'utilisateur choisit un mode de jeu
 	 */
 	public SidePanel(PlayerType initialWhite, PlayerType initialBlack,
 			Runnable onNewGame, Runnable onUndo, Runnable onSwap,
 			BiConsumer<CellColor, PlayerType> onPlayerChanged,
-			Consumer<Boolean> onNumbersToggle)
+			Consumer<Boolean> onNumbersToggle,
+			Consumer<GameMode> onModeChosen)
 	{
 		this.onPlayerChanged = onPlayerChanged;
+		this.onModeChosen = onModeChosen;
 		selection.put(CellColor.WHITE, initialWhite);
 		selection.put(CellColor.BLACK, initialBlack);
 
@@ -110,7 +115,23 @@ public class SidePanel extends JPanel
 		subtitle.setFont(Theme.BODY);
 		subtitle.setForeground(Theme.TEXT_MUTED);
 		add(left(subtitle));
-		add(Box.createVerticalStrut(22));
+		add(Box.createVerticalStrut(20));
+
+		add(left(section("MODE DE JEU")));
+		add(Box.createVerticalStrut(8));
+		JPanel modeRow = new JPanel(new GridLayout(1, GameMode.values().length, 6, 0));
+		modeRow.setOpaque(false);
+		for (GameMode mode : GameMode.values())
+		{
+			FlatButton button = new FlatButton(mode.getLabel(), Theme.CARD, Theme.TEXT);
+			button.setFont(Theme.BODY);
+			button.addActionListener(e -> onModeChosen.accept(mode));
+			modeButtons.put(mode, button);
+			modeRow.add(button);
+		}
+		modeRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+		add(left(modeRow));
+		add(Box.createVerticalStrut(18));
 
 		add(left(section("JOUEURS")));
 		add(Box.createVerticalStrut(8));
@@ -196,6 +217,8 @@ public class SidePanel extends JPanel
 		statusLabel.setForeground(next.isOver() ? Theme.VICTORY : Theme.TEXT);
 		undoButton.setEnabled(next.canUndo());
 		updatePendingLabel();
+		GameMode current = GameMode.of(next.white(), next.black());
+		modeButtons.forEach((mode, button) -> button.setSelected(mode == current));
 		if (historyChanged)
 		{
 			historyModel.clear();

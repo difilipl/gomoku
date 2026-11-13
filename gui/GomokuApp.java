@@ -38,7 +38,7 @@ public class GomokuApp
 		boardPanel = new BoardPanel(controller::humanMove);
 		sidePanel = new SidePanel(DEFAULT_WHITE, DEFAULT_BLACK,
 				this::newGame, controller::undo, this::swapColors,
-				this::onPlayerChanged, boardPanel::setShowMoveNumbers);
+				this::onPlayerChanged, boardPanel::setShowMoveNumbers, this::onModeChosen);
 
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setLayout(new BorderLayout());
@@ -80,6 +80,21 @@ public class GomokuApp
 		PlayerType white = sidePanel.getSelection(CellColor.WHITE);
 		sidePanel.setSelection(CellColor.WHITE, sidePanel.getSelection(CellColor.BLACK));
 		sidePanel.setSelection(CellColor.BLACK, white);
+		newGame();
+	}
+
+	/**
+	 * Applique un mode de jeu et lance la partie tout de suite.
+	 * L'humain garde sa couleur actuelle (les Blancs s'il n'y avait pas d'humain).
+	 */
+	private void onModeChosen(GameMode mode)
+	{
+		boolean humanIsBlack = sidePanel.getSelection(CellColor.BLACK).isHuman()
+				&& !sidePanel.getSelection(CellColor.WHITE).isHuman();
+		CellColor humanColor = humanIsBlack ? CellColor.BLACK : CellColor.WHITE;
+		CellColor opponentColor = humanIsBlack ? CellColor.WHITE : CellColor.BLACK;
+		sidePanel.setSelection(humanColor, PlayerType.HUMAN);
+		sidePanel.setSelection(opponentColor, mode.getOpponent());
 		newGame();
 	}
 
