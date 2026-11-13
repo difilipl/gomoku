@@ -27,6 +27,21 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
 
     // Nombre de pierres alignées pour gagner.
     private static final int WIN_LENGTH = 5;
+    /** Longueur d'un 4 : il manque une pierre pour gagner. */
+    private static final int FOUR_LENGTH = WIN_LENGTH - 1;
+    /** Longueur d'un 3 : il manque deux pierres pour gagner. */
+    private static final int THREE_LENGTH = WIN_LENGTH - 2;
+    /**
+     * Bonus pour deux 4, ou un 4 et un 3 ouvert : l'adversaire ne peut bloquer qu'une
+     * des deux menaces, c'est aussi fort qu'un 4 ouvert (100 000 dans le barème).
+     * Reste sous WIN_SCORE et sous le score d'un 4 dont le propriétaire joue (victoire immédiate).
+     */
+    private static final int FOUR_THREE_BONUS = 100_000;
+    /**
+     * Bonus pour deux 3 ouverts : gagnant aussi, mais un coup plus tard et seulement si
+     * l'adversaire n'a pas de 4 pour reprendre la main, donc dix fois moins que FOUR_THREE_BONUS.
+     */
+    private static final int DOUBLE_THREE_BONUS = 10_000;
     // Une suite a au plus deux extrémités.
     private static final int MAX_OPEN_ENDS = 2;
     // Score d'une suite gagnante (5 ou plus), bien au-dessus de tous les autres motifs.
@@ -202,6 +217,10 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
      * Version naïve (référence) : on parcourt toutes les cases et, pour chaque pierre,
      * les 4 directions. Une suite n'est mesurée qu'à partir de sa première pierre
      * (isStarting), pour ne pas la compter plusieurs fois.
+     * Combinaisons : on compte au passage, pour chaque joueur, ses 4 (au moins une extrémité
+     * libre) et ses 3 ouverts (deux extrémités libres), puis comboBonus ajoute un bonus
+     * quand le joueur a deux menaces à la fois : le barème par suite ne voit pas qu'un
+     * 4 + 3 ouvert ou un double 3 ouvert est déjà presque gagné.
      * @param isMyTurn vrai si c'est à l'IA de jouer dans la position évaluée
      *                 (choisit le barème de chaque suite)
      */
@@ -211,6 +230,10 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
 
         int myPoints = 0;
         int enemyPoints = 0;
+        int myFours = 0;
+        int myOpenThrees = 0;
+        int enemyFours = 0;
+        int enemyOpenThrees = 0;
 
         for (int i = 0; i < board.SIZE * board.SIZE; i++){
             int row = i / board.SIZE;
@@ -220,18 +243,47 @@ public class MinMaxSimplePlayer extends AbstractPlayer {
 
             for(Direction d : Direction.values()){
                 if(isStarting(new Coords(row, column), d, color)){
+
                     boolean isMine = color == playerColor;
                     boolean ownerMovesNext = isMine == isMyTurn;
-                    int score = scoreSequence(lenthcut(row, column, d, color), ownerMovesNext);
+                    Sequence sequence = lenthcut(row,column,d,color);
+                    int score = scoreSequence(sequence, ownerMovesNext);
+                    if(sequence.getLength() == THREE_LENGTH && sequence.getOpenEnds() == MAX_OPEN_ENDS){
+                        if(isMine) myOpenThrees++;
+                        else enemyOpenThrees++;
+                    }
+                    if(sequence.getLength() == FOUR_LENGTH && sequence.getOpenEnds() != 0){
+                        if(isMine) myFours++;
+                        else enemyFours++;
+                    }
                     if(isMine) myPoints += score;
                     else enemyPoints += score;
                 }
             }
         }
+        myPoints += comboBonus(myFours, myOpenThrees);
+        enemyPoints += comboBonus(enemyFours, enemyOpenThrees);
         return myPoints - enemyPoints;
     }
 
 
+
+    /**
+     * Bonus d'un joueur pour ses combinaisons de menaces (l'adversaire ne peut en bloquer qu'une).
+     * @param fours nombre de 4 du joueur (au moins une extrémité libre)
+     * @param openThrees nombre de 3 ouverts du joueur (deux extrémités libres)
+     * @return FOUR_THREE_BONUS pour au moins deux 4 ou un 4 et un 3 ouvert,
+     *         sinon DOUBLE_THREE_BONUS pour au moins deux 3 ouverts, sinon 0
+     */
+    private int comboBonus(int fours, int openThrees){
+        if(fours >= 1 && openThrees >= 1 || fours >= 2){
+            return FOUR_THREE_BONUS;
+        }
+        if(openThrees >= 2){
+            return DOUBLE_THREE_BONUS;
+        }
+        return 0;
+    }
 
     /**
      * Liste des coups candidats (case vide proche d'une pierre), triée par note locale

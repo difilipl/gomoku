@@ -240,6 +240,18 @@ Corrigé : racine = 6, l'IA joue C. Coupures : la feuille 9 de A2 (A2 reçoit (�
 - Profondeur 5 (exacte) : **65 215 / 116 158 / 113 628 / 4 198** appels, 160 à 220 ms par coup. Coups : 7 9, 7 8, 9 8, 8 13 (comme à la profondeur 4). Meilleurs scores : 990 / 1 021 / 1 120 / 2 020.
 - Conséquence : la profondeur 4 passe de plusieurs secondes à quelques dizaines de millisecondes, et la profondeur 5 exacte devient jouable (moins d'un quart de seconde par coup), alors qu'elle était hors de portée sans l'ordre des coups.
 
+### Essai abandonné : killer moves (branche `killer-moves`, 2026-11-13)
+- Principe : si un coup provoque la coupure alpha-bêta, on l'essaie en premier dans les autres nœuds de la même profondeur, s'il y est jouable. Tableau `killerMoves` de `Coords`, une case par profondeur, en **attribut** (il doit survivre d'un appel de `minMax` à l'autre, contrairement à la liste `moves`). Enregistré juste avant le `break` ; avant le `for`, `moveKillerFirst` le cherche dans `moves` (comparaison de `row` et `col`, car `Coords` n'a pas d'`equals`) et le passe en tête s'il y est. Exact : mêmes coups, seul l'ordre change.
+- Mesures (test 1, mêmes coups) :
+  - profondeur 3 : 1 471 / 2 122 / 2 500, contre 1 181 / 1 918 / 2 446 sans killer ;
+  - profondeur 5 : 65 293 / 128 727 / 178 709 / 105 920, contre 65 215 / 116 158 / 113 628 / 4 198 sans killer.
+- Conclusion : **plus lent**. Le tri local (attaque + défense) est déjà très bon ; le killer, venu d'une autre branche, passe devant le meilleur coup du tri. Pire au 4e coup (×25) : les killers ne sont jamais effacés, ceux du coup précédent passent devant le blocage forcé que le tri mettait en tête. Version abandonnée, on garde `move-ordering`. Pistes si on y revenait : effacer les killers à chaque appel de `play`, ou placer le killer en 2e position, après le meilleur coup du tri.
+
+### Match contre la sélective (profondeur 10), exacte en profondeur 5 (branche `match-selective`, 2026-11-13)
+- Exacte en premier (Blanc) : **l'exacte gagne** au 39e coup (5 sur la ligne 11). Scores négatifs en milieu de partie (−115 à −297), puis menace forcée trouvée (99 755) et victoire vue à l'avance (1 000 001). 1,9 s par coup en moyenne, jusqu'à 11,7 s en fin de partie (2,5 millions d'appels) : le nombre de candidats grandit avec les pierres.
+- Sélective en premier (Blanc) : **la sélective gagne** au 29e coup (5 sur la ligne 6). Les scores de l'exacte deviennent négatifs dès le 8e coup (−90, puis −189, −376) ; au 24e coup, elle voit la défaite (−400 194, puis −1 000 002) mais il est trop tard. 157 ms par coup pour l'exacte, 14 ms pour la sélective.
+- Bilan : 1-1 (hier 0-2 en profondeur 3). Le premier joueur a un gros avantage au Gomoku. En second, la profondeur 5 ne voit pas assez tôt les combinaisons préparées par la sélective (effet d'horizon) ; `evaluate` ne sait pas qu'un 4 + 3 ouvert ou un double 3 ouvert est déjà gagnant. Piste prévue : `evaluate` qui reconnaît ces combinaisons.
+
 ## 1 septies. evaluate qui reconnaît les combinaisons (branche `combo-eval`, 2026-11-13)
 - Problème vu dans le match en second : le barème note chaque suite séparément. Un 4 bloqué d'un côté + un 3 ouvert vaut ~2 000 points, alors que c'est aussi gagnant qu'un 4 ouvert (100 000) : l'adversaire ne peut bloquer qu'une des deux menaces.
 - Dans `evaluate`, on garde le `Sequence` de chaque suite et on compte par joueur : les 4 (`FOUR_LENGTH`, au moins une extrémité libre) et les 3 ouverts (`THREE_LENGTH`, deux extrémités libres). Après la boucle, `comboBonus(fours, openThrees)` :
