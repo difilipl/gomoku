@@ -261,7 +261,9 @@ Corrigé : racine = 6, l'IA joue C. Coupures : la feuille 9 de A2 (A2 reçoit (�
 - Coût : quelques compteurs et `if` dans la boucle existante, le nombre d'appels ne change pas.
 - Limite : les lignes trouées (`X X _ X`) ne sont pas encore reconnues (le comptage les coupe en deux).
 - Test 1, profondeur 5 : mêmes appels et mêmes coups qu'avant (65 215 / 116 158 / 113 628 / 4 198 ; pas de combinaison en début de partie). Au 4e coup, meilleur score 12 020 au lieu de 2 020 : le double 3 ouvert est reconnu (+10 000).
-- À mesurer : match en second contre la sélective.
+- Match en second contre la sélective (profondeur 5) : **partie strictement identique** à celle d'avant le bonus (mêmes coups, la sélective gagne au 29e coup). Le bonus ne change aucun choix de Noir : les scores restent autour de −100 à −376 jusqu'au 24e coup, puis −400 194 quand la défaite est déjà inévitable. La combinaison de la sélective n'apparaît donc pas dans les feuilles à 5 demi-coups sous une forme que `evaluate` reconnaît (lignes trouées comme `X X _ X`, ou menace qui se forme au-delà de l'horizon).
+- Match en premier avec le bonus : **l'exacte gagne encore**, au 45e coup (partie différente d'avant, car `evaluate` a changé). 1,25 s par coup en moyenne, 4,7 s au maximum (avant : 1,9 s et 11,7 s). Menace forcée vue à 99 777, victoire vue à l'avance (1 000 001). Bilan avec le bonus : toujours 1-1.
+- Pistes : reconnaître les lignes trouées ; prolonger la recherche sur les coups forcés (blocage d'un 4) pour voir plus loin dans les séquences de menaces.
 
 ## 2. Versions suivantes (optimisations à comparer)
 Pour chaque version, noter le nombre d'appels avant et après.

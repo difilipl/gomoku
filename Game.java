@@ -21,7 +21,7 @@ public class Game
 {
 	public static void main(String[] args)
 	{
-		exSelective();
+		exSelectiveVsExact();
 		//ex1();
 		// ex2();
 		// ...
